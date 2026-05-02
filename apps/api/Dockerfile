@@ -22,7 +22,11 @@ RUN pip install \
     "alembic>=1.13" \
     "neo4j>=5.20" \
     "pgvector>=0.2.5" \
-    "prometheus-client>=0.20"
+    "prometheus-client>=0.20" \
+    "openai>=1.50" \
+    "docker>=7.0" \
+    "supabase>=2.5,<3" \
+    "PyJWT>=2.8"
 
 EXPOSE 8000
 

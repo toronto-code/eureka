@@ -56,12 +56,53 @@ export default function TeamPage() {
     }
   }
 
+  // Tick every 30s so the 20-minute filter re-evaluates and stale rows roll off
+  // even when no new actions arrive.
+  const [now, setNow] = useState(Date.now());
   useEffect(() => {
-    void load();
+    const t = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(t);
   }, []);
 
+  useEffect(() => {
+    void load();
+    let es: EventSource | null = null;
+    let closed = false;
+    try {
+      es = new EventSource(`${API_URL}/chat/actions/stream`);
+      es.onmessage = (e) => {
+        if (closed) return;
+        try {
+          const evt = JSON.parse(e.data);
+          if (evt && evt.tool) void load();
+        } catch {}
+      };
+      es.onerror = () => {
+        if (es && !closed) {
+          closed = true;
+          es.close();
+        }
+      };
+    } catch {
+      // ignore — SSE is optional, page still works without it
+    }
+    return () => {
+      closed = true;
+      try { es?.close(); } catch {}
+    };
+  }, []);
+
+  // 20-minute sliding window for the dashboard
+  const RECENT_WINDOW_MS = 20 * 60 * 1000;
+  const cutoff = now - RECENT_WINDOW_MS;
+  const recentActivity = activity.filter((a) => {
+    if (!a.at) return false;
+    const t = new Date(a.at).getTime();
+    return Number.isFinite(t) && t >= cutoff;
+  });
+
   const userActionMap = new Map<string, Map<string, number>>();
-  for (const a of activity) {
+  for (const a of recentActivity) {
     if (!a.user_id) continue;
     const inner = userActionMap.get(a.user_id) || new Map<string, number>();
     inner.set(a.label, (inner.get(a.label) || 0) + 1);
@@ -95,7 +136,7 @@ export default function TeamPage() {
         <h3 style={{ marginBottom: 12 }}>Network</h3>
         <TeamWebGraph
           profiles={profiles}
-          activity={activity}
+          activity={recentActivity}
           currentUserId={user?.id}
           web={web}
         />
@@ -182,12 +223,19 @@ export default function TeamPage() {
       </div>
 
       <div className="card" style={{ padding: 18 }}>
-        <h3 style={{ marginBottom: 12 }}>Recent activity ({activity.length})</h3>
-        {activity.length === 0 ? (
-          <p style={{ color: "var(--text-muted)", fontSize: 13 }}>No activity yet. Use the orchestrator to generate some.</p>
+        <h3 style={{ marginBottom: 12 }}>
+          Recent activity ({recentActivity.length})
+          <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 400, marginLeft: 8 }}>
+            last 20 minutes
+          </span>
+        </h3>
+        {recentActivity.length === 0 ? (
+          <p style={{ color: "var(--text-muted)", fontSize: 13 }}>
+            No activity in the last 20 minutes. Use the orchestrator to generate some.
+          </p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            {activity.slice(0, 30).map((a, i) => (
+            {recentActivity.slice(0, 30).map((a, i) => (
               <div
                 key={i}
                 style={{

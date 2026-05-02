@@ -46,6 +46,9 @@ services:
       JIRA_EMAIL: ${JIRA_EMAIL:-}
       JIRA_API_TOKEN: ${JIRA_API_TOKEN:-}
       JIRA_PROJECT_KEY: ${JIRA_PROJECT_KEY:-}
+      # chat_intel reads these alternate names (from mycelium prototype)
+      JIRA_TOKEN: ${JIRA_TOKEN:-${JIRA_API_TOKEN:-}}
+      JIRA_DOMAIN: ${JIRA_DOMAIN:-}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       GITHUB_OWNER: ${GITHUB_OWNER:-}
       # Legacy stack uses GITHUB_ORG; MVP treats it like GITHUB_OWNER when OWNER is unset.
