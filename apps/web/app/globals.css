@@ -770,19 +770,19 @@ textarea {
 }
 
 .ol-example-prompt {
-  background: var(--bg-elev);
-  border: 1px solid var(--border);
-  color: var(--text);
-  padding: 8px 16px;
-  border-radius: 16px;
+  background: transparent;
+  border: none;
+  color: var(--neutral-500);
+  padding: 6px 10px;
+  border-radius: 0;
   font-size: 13px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: color 0.15s ease;
 }
 
 .ol-example-prompt:hover {
-  background: var(--neutral-100);
-  border-color: var(--brand-blue);
+  background: transparent;
+  border: none;
   color: var(--brand-blue);
 }
 
@@ -1156,4 +1156,378 @@ textarea {
   border-top: 1px solid var(--border);
   text-align: center;
   font-size: 13px;
+}
+
+/* =====================================================================
+   Orchestrator (OL) page layout — tabs + centered content
+===================================================================== */
+
+.ol-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ol-tabs {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ol-tabs-bar {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--neutral-100);
+  border-radius: var(--radius-pill);
+  margin-bottom: 28px;
+}
+
+.ol-tab {
+  background: transparent;
+  border: none;
+  color: var(--neutral-500);
+  padding: 6px 18px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.ol-tab:hover {
+  color: var(--neutral-900);
+}
+
+.ol-tab.active {
+  background: var(--bg-elev);
+  color: var(--neutral-900);
+  box-shadow: var(--shadow-card);
+}
+
+.ol-tab-panel {
+  width: 100%;
+}
+
+.ol-center {
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.ol-page-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.ol-page-header h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.3px;
+  color: var(--neutral-900);
+}
+
+.ol-page .run-grid {
+  grid-template-columns: 1fr;
+}
+
+/* ----- Chat thread ----- */
+.ol-thread {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 60vh;
+}
+
+.ol-thread-scroll {
+  flex: 1;
+  overflow-y: auto;
+  max-height: calc(100vh - 280px);
+  padding: 8px 4px;
+}
+
+.ol-thread-empty {
+  padding: 60px 16px;
+  text-align: center;
+}
+
+.ol-thread-empty-hint {
+  color: var(--neutral-500);
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+
+.ol-thread-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ol-msg {
+  display: flex;
+  width: 100%;
+}
+
+.ol-msg-user {
+  justify-content: flex-end;
+}
+
+.ol-msg-assistant {
+  justify-content: flex-start;
+}
+
+.ol-msg-bubble {
+  max-width: 82%;
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.ol-msg-user .ol-msg-bubble {
+  background: var(--brand-blue);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.ol-msg-assistant .ol-msg-bubble {
+  background: var(--bg-elev);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+
+.ol-msg-thinking {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  padding: 12px 16px;
+}
+
+.ol-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--neutral-400);
+  animation: ol-dot-bounce 1.2s infinite ease-in-out both;
+}
+
+.ol-dot:nth-child(1) { animation-delay: -0.32s; }
+.ol-dot:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes ol-dot-bounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+.ol-msg-error {
+  color: var(--red);
+  background: var(--red-soft) !important;
+  border-color: var(--red) !important;
+}
+
+.ol-msg-meta {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.ol-msg-reasoning {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.ol-msg-blocked {
+  margin: 6px 0;
+  font-size: 12px;
+  color: var(--red);
+  font-weight: 500;
+}
+
+.ol-msg-links {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.ol-msg-detail-link {
+  font-size: 12px;
+  color: var(--brand-blue);
+  text-decoration: none;
+  margin-left: auto;
+}
+
+.ol-msg-detail-link:hover {
+  text-decoration: underline;
+}
+
+.ol-thread-input {
+  position: sticky;
+  bottom: 0;
+  background: var(--bg-page);
+  padding-top: 8px;
+}
+
+/* ----- Discrete top-right insights/actions panels ----- */
+.ol-panels {
+  position: absolute;
+  top: -56px;
+  right: 0;
+  z-index: 10;
+}
+
+.ol-panels-bar {
+  display: flex;
+  gap: 6px;
+}
+
+.ol-panel-btn {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  color: var(--neutral-500);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.ol-panel-btn:hover {
+  color: var(--brand-blue);
+  border-color: var(--brand-blue);
+}
+
+.ol-panel-btn.active {
+  color: var(--brand-blue);
+  border-color: var(--brand-blue);
+  background: var(--accent-soft);
+}
+
+.ol-panel-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--brand-blue);
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.ol-panel-popover {
+  position: absolute;
+  top: 40px;
+  right: 0;
+  width: 320px;
+  max-height: 420px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+}
+
+.ol-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--neutral-900);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ol-panel-close {
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  color: var(--text-faint);
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.ol-panel-close:hover {
+  color: var(--neutral-900);
+}
+
+.ol-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ol-panel-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+  text-align: center;
+  padding: 12px 0;
+}
+
+.ol-panel-insight {
+  padding: 8px 10px;
+  border-radius: 5px;
+}
+
+.ol-panel-insight-title {
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.ol-panel-insight-desc {
+  font-size: 11px;
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.ol-panel-action {
+  padding: 5px 9px;
+  background: var(--bg);
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.ol-panel-action-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ol-panel-action-time {
+  color: var(--text-faint);
+  font-size: 9px;
+}
+
+.ol-panel-action-summary {
+  color: var(--text-muted);
+  font-size: 10px;
+  margin-top: 2px;
 }

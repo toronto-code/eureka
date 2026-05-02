@@ -64,9 +64,11 @@ const STYLE: any[] = [
 export function TeamWebGraph({ profiles, activity, currentUserId, web }: Props) {
   const ref = useRef<HTMLDivElement | null>(null);
   const cyRef = useRef<Core | null>(null);
+  const hasData = profiles.length > 0;
 
   useEffect(() => {
     if (!ref.current) return;
+    if (!hasData) return;
     const nodes: cytoscape.NodeDefinition[] = [];
     const edges: cytoscape.EdgeDefinition[] = [];
 
@@ -132,11 +134,36 @@ export function TeamWebGraph({ profiles, activity, currentUserId, web }: Props) 
       wheelSensitivity: 0.2,
     });
     return () => cyRef.current?.destroy();
-  }, [profiles, activity, currentUserId, web]);
+  }, [profiles, activity, currentUserId, web, hasData]);
 
   return (
     <div style={{ position: "relative" }}>
-      <div ref={ref} style={{ height: 480, width: "100%", background: "var(--neutral-100)", borderRadius: "var(--radius)" }} />
+      <div
+        ref={ref}
+        style={{
+          height: 480,
+          width: "100%",
+          background: "var(--neutral-100)",
+          borderRadius: "var(--radius)",
+          overflow: "hidden",
+        }}
+      />
+      {!hasData && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "var(--text-muted)",
+            fontSize: 13,
+            pointerEvents: "none",
+          }}
+        >
+          Loading network…
+        </div>
+      )}
       <div style={{ position: "absolute", bottom: 8, right: 12, fontSize: 10, color: "var(--text-muted)", display: "flex", flexWrap: "wrap", gap: 10 }}>
         <Legend color="#2946CA" label="you" />
         <Legend color="#7c66e0" label="teammate" />

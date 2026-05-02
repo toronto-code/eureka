@@ -108,7 +108,14 @@ export default function TeamPage() {
         {profiles.length === 0 ? (
           <p style={{ color: "var(--text-muted)", fontSize: 13 }}>No users yet.</p>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+              gap: 12,
+              alignItems: "stretch",
+            }}
+          >
             {profiles.map((p) => {
               const isYou = p.id === user?.id;
               const actions = userActionMap.get(p.id);
@@ -119,6 +126,9 @@ export default function TeamPage() {
                   className="card"
                   style={{
                     padding: 14,
+                    minHeight: 140,
+                    display: "flex",
+                    flexDirection: "column",
                     borderColor: isYou ? "var(--accent)" : "var(--border)",
                     background: isYou ? "var(--accent-soft)" : "var(--bg-elev)",
                   }}
@@ -145,25 +155,25 @@ export default function TeamPage() {
                     {p.jira_email && <span>jira: {p.jira_email} · </span>}
                     joined {new Date(p.created_at).toLocaleDateString()}
                   </div>
-                  {actions && actions.size > 0 && (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 8 }}>
-                      {Array.from(actions.entries()).slice(0, 6).map(([tool, n]) => (
-                        <span
-                          key={tool}
-                          style={{
-                            fontSize: 10,
-                            background: "var(--bg)",
-                            color: "var(--text)",
-                            padding: "2px 7px",
-                            borderRadius: 4,
-                            border: "1px solid var(--border)",
-                          }}
-                        >
-                          {tool} ×{n}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: "auto", paddingTop: 8 }}>
+                    {actions && actions.size > 0
+                      ? Array.from(actions.entries()).slice(0, 6).map(([tool, n]) => (
+                          <span
+                            key={tool}
+                            style={{
+                              fontSize: 10,
+                              background: "var(--bg)",
+                              color: "var(--text)",
+                              padding: "2px 7px",
+                              borderRadius: 4,
+                              border: "1px solid var(--border)",
+                            }}
+                          >
+                            {tool} ×{n}
+                          </span>
+                        ))
+                      : <span style={{ fontSize: 10, color: "var(--text-faint)" }}>no recent actions</span>}
+                  </div>
                 </div>
               );
             })}
@@ -174,7 +184,7 @@ export default function TeamPage() {
       <div className="card" style={{ padding: 18 }}>
         <h3 style={{ marginBottom: 12 }}>Recent activity ({activity.length})</h3>
         {activity.length === 0 ? (
-          <p style={{ color: "var(--text-muted)", fontSize: 13 }}>No activity yet. Use the chat to generate some.</p>
+          <p style={{ color: "var(--text-muted)", fontSize: 13 }}>No activity yet. Use the orchestrator to generate some.</p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             {activity.slice(0, 30).map((a, i) => (
