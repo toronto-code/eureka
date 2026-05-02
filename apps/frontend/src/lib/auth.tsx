@@ -47,6 +47,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return error ? { error: error.message } : {};
     },
     async signOut() {
+      // Wipe DASHBOARD-only data on logout (agent_actions + observer_events).
+      // Chats and conversations are kept across sessions — like ChatGPT.
+      try {
+        const { data: { session: s } } = await supabase.auth.getSession();
+        if (s) {
+          await Promise.all([
+            supabase.from("agent_actions").delete().eq("user_id", s.user.id),
+            supabase.from("observer_events").delete().eq("user_id", s.user.id),
+          ]);
+        }
+      } catch {
+        // best-effort — sign out anyway
+      }
       await supabase.auth.signOut();
     },
   };
