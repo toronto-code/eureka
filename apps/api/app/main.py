@@ -20,7 +20,20 @@ from sqlalchemy.exc import OperationalError
 
 from app.config import get_settings
 from app.db import Base, SessionLocal, engine
-from app.routes import agents, credentials, ingestion, ol, projects, system, tasks, webhooks
+from app.routes import (
+    agent_chat,
+    agents,
+    chat_intel,
+    credentials,
+    dashboard_web,
+    docker_obs,
+    ingestion,
+    ol,
+    projects,
+    system,
+    tasks,
+    webhooks,
+)
 
 # Ensure all model modules are imported so metadata is populated.
 from app import models  # noqa: F401
@@ -50,6 +63,8 @@ def _init_db_safely() -> None:
 
 @asynccontextmanager
 async def _lifespan(_: FastAPI):
+    import asyncio
+
     settings = get_settings()
     logging.basicConfig(level=getattr(logging, settings.log_level.upper(), logging.INFO))
     _init_db_safely()
@@ -61,6 +76,16 @@ async def _lifespan(_: FastAPI):
     except Exception as exc:  # noqa: BLE001
         logger.warning("Watcher failed to start (non-fatal): %s", exc)
         stop_watcher_task = None  # type: ignore[assignment]
+
+    # Start docker event listener (no-op if docker socket unavailable).
+    docker_event_task = None
+    try:
+        docker_event_task = asyncio.create_task(
+            docker_obs._docker_event_loop(), name="docker-events"
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Docker event loop failed to start (non-fatal): %s", exc)
+
     try:
         yield
     finally:
@@ -69,6 +94,8 @@ async def _lifespan(_: FastAPI):
                 stop_watcher_task()
             except Exception:  # noqa: BLE001
                 pass
+        if docker_event_task is not None:
+            docker_event_task.cancel()
 
 
 def create_app() -> FastAPI:
@@ -94,6 +121,11 @@ def create_app() -> FastAPI:
     app.include_router(projects.router)
     app.include_router(ol.router)
     app.include_router(webhooks.router)
+    # Mycelium agent surface (chat, observability, dashboard data).
+    app.include_router(chat_intel.router)
+    app.include_router(agent_chat.router)
+    app.include_router(docker_obs.router)
+    app.include_router(dashboard_web.router)
     return app
 
 

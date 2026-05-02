@@ -59,3 +59,44 @@ def current_project_data() -> dict[str, Any]:
     from app.seed import build_demo_project_data
 
     return build_demo_project_data().model_dump()
+
+
+@router.get("/observability")
+def observability_summary(session: Session = Depends(get_db)) -> dict[str, Any]:
+    """Return system observability status."""
+    from datetime import datetime, timezone
+
+    settings = get_settings()
+    
+    # Check database
+    db_status = "ok"
+    try:
+        session.execute(text("SELECT 1"))
+    except Exception:  # noqa: BLE001
+        db_status = "error"
+    
+    # Check integrations
+    integrations = {
+        "openai": "ok" if settings.openai_configured else "not_configured",
+        "github": "ok" if settings.effective_github_owner and settings.github_repo else "not_configured",
+        "jira": "ok" if settings.jira_configured else "not_configured",
+    }
+    
+    return {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "services": [
+            {"service": "database", "status": db_status},
+            {"service": "api", "status": "ok"},
+        ],
+        "integrations": integrations,
+        "watchers": {
+            "jira_watcher": {
+                "enabled": settings.jira_watcher_enabled,
+                "interval": settings.jira_watcher_interval_seconds,
+            },
+        },
+        "config": {
+            "auto_execute": settings.bot_auto_execute_enabled,
+            "github_real_mode": settings.mycelium_allow_real_github,
+        },
+    }

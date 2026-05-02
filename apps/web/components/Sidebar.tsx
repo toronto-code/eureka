@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Fragment } from "react";
+import { useAuth } from "@/lib/auth";
 
 type NavItem = {
   href: string;
@@ -13,16 +14,16 @@ type NavItem = {
 
 const NAV: NavItem[] = [
   { href: "/", label: "Dashboard" },
+  { href: "/team", label: "Team Web" },
   { href: "/ol", label: "Orchestrator" },
-  { href: "/tasks", label: "Tasks" },
   { href: "/ingestion", label: "Ingestion" },
-  { href: "/orchestration", label: "Orchestration (legacy)" },
-  { href: "/agents", label: "Agents" },
+  { href: "/observability", label: "Observability" },
   { href: "/settings", label: "Settings", divider: true },
 ];
 
 export function Sidebar() {
   const pathname = usePathname() ?? "/";
+  const { user, signOut } = useAuth();
   return (
     <aside className="sidebar">
       <h1>Mycelium</h1>
@@ -43,6 +44,35 @@ export function Sidebar() {
         })}
       </nav>
       <div className="sidebar-spacer" />
+      <div
+        style={{
+          padding: "0 10px 12px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 6,
+          fontSize: 11,
+          color: "rgba(255,255,255,0.6)",
+        }}
+      >
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {user?.email ?? "—"}
+        </span>
+        <button
+          onClick={() => signOut()}
+          style={{
+            background: "transparent",
+            border: "1px solid rgba(255,255,255,0.12)",
+            color: "rgba(255,255,255,0.6)",
+            padding: "5px 8px",
+            borderRadius: 4,
+            cursor: "pointer",
+            fontSize: 11,
+            textAlign: "left",
+          }}
+        >
+          Sign out
+        </button>
+      </div>
     </aside>
   );
 }

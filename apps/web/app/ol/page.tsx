@@ -1,6 +1,7 @@
 import { api } from "../../lib/api";
+import { OLChatThread } from "../../components/OLChatThread";
+import { OLPageTabs } from "../../components/OLPageTabs";
 import { OLRunCard } from "../../components/OLRunCard";
-import { OLRunForm } from "../../components/OLRunForm";
 
 export const dynamic = "force-dynamic";
 
@@ -11,31 +12,37 @@ export default async function OLPage() {
     ? await api.listOrchestratorRuns(defaultProject.id, 30)
     : [];
 
-  return (
-    <main className="page">
-      <header className="page-header">
+  const runPanel = (
+    <div className="ol-center">
+      <header className="ol-page-header">
         <h1>Orchestrator</h1>
-        <p className="muted">
-          OL classifies each request, builds a retrieval plan, and dispatches to
-          one of six lanes. Every decision is audited here.
-        </p>
       </header>
+      <OLChatThread projects={projects} defaultProjectId={defaultProject?.id} />
+    </div>
+  );
 
-      <OLRunForm projects={projects} defaultProjectId={defaultProject?.id} />
-
-      <section>
-        <h2>Recent runs</h2>
-        {runs.length === 0 && (
-          <div className="card muted">
-            No runs yet. Submit a request above to create one.
-          </div>
-        )}
+  const historyPanel = (
+    <div className="ol-center">
+      <header className="ol-page-header">
+        <h1>History</h1>
+      </header>
+      {runs.length === 0 ? (
+        <div className="card muted">
+          No runs yet. Submit a request from the Run tab to create one.
+        </div>
+      ) : (
         <div className="run-grid">
           {runs.map((r) => (
             <OLRunCard key={r.id} run={r} />
           ))}
         </div>
-      </section>
+      )}
+    </div>
+  );
+
+  return (
+    <main className="page ol-page">
+      <OLPageTabs runPanel={runPanel} historyPanel={historyPanel} />
     </main>
   );
 }

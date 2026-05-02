@@ -64,8 +64,19 @@ services:
       ENABLE_DEMO_SEED: ${ENABLE_DEMO_SEED:-true}
       MYCELIUM_CREDENTIALS_KEY: ${MYCELIUM_CREDENTIALS_KEY:-}
       MYCELIUM_SETUP_TOKEN: ${MYCELIUM_SETUP_TOKEN:-}
+      # Supabase (auth + agent storage)
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY:-}
+      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:-}
+      # Mycelium agent
+      MYCELIUM_AGENT_WRITES_ENABLED: ${MYCELIUM_AGENT_WRITES_ENABLED:-false}
+      MYCELIUM_REPO_ALLOWLIST: ${MYCELIUM_REPO_ALLOWLIST:-}
+      SLACK_TOKEN: ${SLACK_TOKEN:-}
     ports:
       - "8000:8000"
+    volumes:
+      # Mount docker socket so docker_obs can talk to host Docker.
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       postgres:
         condition: service_healthy
@@ -84,9 +95,16 @@ services:
     build:
       context: ./apps/web
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-}
     environment:
       BACKEND_URL: http://api:8000
       NEXT_PUBLIC_BACKEND_URL: http://localhost:8000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-}
       NODE_ENV: production
     ports:
       - "3000:3000"

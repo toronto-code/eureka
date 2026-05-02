@@ -64,6 +64,7 @@ class OpenAIClient:
         *,
         model: str | None = None,
         temperature: float | None = None,
+        max_tokens: int | None = None,
         fallback: str | None = None,
     ) -> str:
         """Return free-form text from the LLM."""
@@ -74,6 +75,7 @@ class OpenAIClient:
             user_prompt=user_prompt,
             model=model,
             temperature=temperature,
+            max_tokens=max_tokens,
             response_format=None,
         )
 
@@ -85,6 +87,7 @@ class OpenAIClient:
         schema_hint: dict[str, Any] | None = None,
         model: str | None = None,
         temperature: float | None = None,
+        max_tokens: int | None = None,
         fallback: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Return a JSON object from the LLM.
@@ -107,6 +110,7 @@ class OpenAIClient:
             user_prompt=user_prompt,
             model=model,
             temperature=temperature,
+            max_tokens=max_tokens,
             response_format={"type": "json_object"},
         )
         try:
@@ -135,16 +139,19 @@ class OpenAIClient:
         user_prompt: str,
         model: str | None,
         temperature: float | None,
+        max_tokens: int | None,
         response_format: dict[str, str] | None,
     ) -> str:
         last_error: Exception | None = None
         chosen_model = model or self.default_model
         chosen_temp = self.temperature if temperature is None else temperature
+        chosen_max = 900 if max_tokens is None else max_tokens
         for attempt in range(self.max_retries + 1):
             try:
                 kwargs: dict[str, Any] = {
                     "model": chosen_model,
                     "temperature": chosen_temp,
+                    "max_tokens": chosen_max,
                     "messages": [
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},
