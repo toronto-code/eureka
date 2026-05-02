@@ -112,16 +112,17 @@ async def list_permissions() -> dict[str, Any]:
 
 @app.post("/agents/spawn")
 async def spawn_agent(payload: dict) -> dict[str, Any]:
-    """Stub for Claworc-managed OpenClaw spawn.
+    """Create a logical agent for a user.
 
-    Real impl: ask Claworc to create an OpenClaw instance bound to ``owner_user_id``.
+    Agents are lightweight — one per user, in-process. There's no external
+    sandbox to provision; the agent is really just a persistent identity
+    tied to that user's task/memory/learning history.
     """
     owner_user_id = payload.get("owner_user_id", "unknown")
     return {
         "agent_id": f"agent-{owner_user_id}",
         "owner_user_id": owner_user_id,
         "status": "spawned",
-        "stub": True,
     }
 
 
