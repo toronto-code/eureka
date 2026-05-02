@@ -1,4 +1,4 @@
-"""Ingestion services: parse uploaded docs/transcripts and push them into memory."""
+"""Ingestion services: parse approved docs/transcripts and push them into memory."""
 
 from app.ingestion.parsers import parse_text_or_markdown
 from app.ingestion.service import (

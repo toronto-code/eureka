@@ -17,6 +17,7 @@ const NAV: NavItem[] = [
   { href: "/team", label: "Team Web" },
   { href: "/ol", label: "Orchestrator" },
   { href: "/ingestion", label: "Ingestion" },
+  { href: "/incoming", label: "Incoming Data" },
   { href: "/observability", label: "Observability" },
   { href: "/settings", label: "Settings", divider: true },
 ];

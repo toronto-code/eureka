@@ -969,6 +969,67 @@ textarea {
   color: var(--text);
 }
 
+.ol-diff-list {
+  display: grid;
+  gap: 12px;
+}
+
+.ol-diff-file {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+
+.ol-diff-file-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ol-diff-scroll {
+  margin: 0;
+  padding: 8px 10px;
+  max-height: 280px;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--neutral-50);
+}
+
+.ol-diff-row {
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  gap: 8px;
+  white-space: pre;
+}
+
+.ol-diff-row.add {
+  background: rgba(47, 157, 108, 0.12);
+  color: #18593d;
+}
+
+.ol-diff-row.del {
+  background: rgba(194, 69, 61, 0.12);
+  color: #7c2f2a;
+}
+
+.ol-diff-prefix {
+  user-select: none;
+  opacity: 0.85;
+}
+
+.ol-diff-text {
+  overflow-x: auto;
+}
+
+.ol-branch-picker {
+  display: grid;
+  gap: 8px;
+  max-width: 480px;
+}
+
 .timeline { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
 .timeline li { display: grid; grid-template-columns: 72px 180px 1fr; gap: 10px; font-size: 13px; align-items: baseline; }
 .timeline li .time { color: var(--text-faint); font-family: var(--mono); }
@@ -1530,4 +1591,25 @@ textarea {
   color: var(--text-muted);
   font-size: 10px;
   margin-top: 2px;
+}
+
+/* Button ghost variant used by the modal close affordance */
+.btn-ghost {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.btn-ghost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

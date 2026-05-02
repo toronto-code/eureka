@@ -12,6 +12,8 @@ from app.schemas.api import DocumentChunkOut, DocumentDetailOut, DocumentOut
 
 router = APIRouter(prefix="/ingestion", tags=["ingestion"])
 
+ALLOWED_SOURCE_TYPES = {"doc", "transcript"}
+
 
 @router.post("/upload")
 async def upload_document(
@@ -24,9 +26,17 @@ async def upload_document(
 ) -> dict[str, Any]:
     if file is None and not raw_text:
         raise HTTPException(status_code=400, detail="Provide either a file or raw_text.")
-    if source_type not in {"doc", "transcript"}:
-        raise HTTPException(status_code=400, detail="source_type must be 'doc' or 'transcript'.")
+    if source_type not in ALLOWED_SOURCE_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "source_type must be one of: "
+                + ", ".join(sorted(ALLOWED_SOURCE_TYPES))
+            ),
+        )
+
     service = IngestionService()
+
     if file is not None:
         content_bytes = await file.read()
         doc_id = service.ingest_document(

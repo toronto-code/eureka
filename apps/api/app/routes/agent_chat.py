@@ -941,7 +941,6 @@ SLACK CHANNELS YOU CAN POST TO:
 
 TEAM MEMBERS (Slack display names):
   {", ".join(users[:20]) or "(none)"}
-
 When the user asks who has the most commits, who is working on what, what PRs are open, etc — answer directly from the data above. Do NOT say you don't have access; the data is right here.
 """
     except Exception as e:

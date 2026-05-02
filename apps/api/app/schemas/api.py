@@ -141,10 +141,21 @@ class AgentGraphOut(BaseModel):
     edges: list[GraphEdge] = Field(default_factory=list)
 
 
+class IntegrationDiagnostic(BaseModel):
+    """Per-integration operational detail shown on the Settings page."""
+
+    ok: bool
+    status: Literal["operational", "not_configured", "error"] = "not_configured"
+    missing: list[str] = Field(default_factory=list)
+    detail: str | None = None
+    last_checked_at: datetime | None = None
+
+
 class IntegrationStatusOut(BaseModel):
     openai: bool
     jira: bool
     github: bool
+    slack: bool = False
     database: bool
     bot_jira_user: str | None = None
     auto_execute_enabled: bool = False
@@ -154,6 +165,8 @@ class IntegrationStatusOut(BaseModel):
     github_pat_storage_enabled: bool = False
     github_pat_saved_in_database: bool = False
     github_pat_hint: str | None = None
+    # Per-integration diagnostics (why it isn't operational, when checked, etc.)
+    diagnostics: dict[str, IntegrationDiagnostic] = Field(default_factory=dict)
 
 
 class ApprovalDecisionRequest(BaseModel):

@@ -1,19 +1,91 @@
 import { GitHubBotSetup } from "@/components/GitHubBotSetup";
 import { GitHubPatStorage } from "@/components/GitHubPatStorage";
+import { RepoBootstrapCard } from "@/components/RepoBootstrapCard";
 import { api } from "@/lib/api";
+import type { IntegrationDiagnostic } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-function StatusBadge({ ok }: { ok: boolean }) {
+type StatusKind = "operational" | "not_configured" | "error";
+
+const STATUS_LABEL: Record<StatusKind, string> = {
+  operational: "operational",
+  not_configured: "not configured",
+  error: "error",
+};
+
+const STATUS_BADGE: Record<StatusKind, string> = {
+  operational: "badge-green",
+  not_configured: "badge-amber",
+  error: "badge-red",
+};
+
+function StatusPill({ status }: { status: StatusKind }) {
   return (
-    <span className={`badge ${ok ? "badge-green" : "badge-amber"}`}>
-      {ok ? "configured" : "not configured"}
+    <span className={`badge ${STATUS_BADGE[status]}`}>
+      {STATUS_LABEL[status]}
     </span>
   );
 }
 
+function IntegrationRow({
+  name,
+  description,
+  diag,
+}: {
+  name: string;
+  description: string;
+  diag: IntegrationDiagnostic | undefined;
+}) {
+  const status: StatusKind = diag?.status ?? "not_configured";
+  const missing = diag?.missing ?? [];
+  const detail = diag?.detail ?? null;
+  const lastChecked = diag?.last_checked_at;
+
+  return (
+    <div className="row" style={{ flexDirection: "column", alignItems: "stretch" }}>
+      <div className="flex" style={{ justifyContent: "space-between", gap: 12 }}>
+        <div className="flex-col" style={{ gap: 4, minWidth: 0 }}>
+          <div className="flex" style={{ gap: 8, alignItems: "center" }}>
+            <strong>{name}</strong>
+            <StatusPill status={status} />
+          </div>
+          <div className="faint" style={{ fontSize: 12 }}>
+            {description}
+          </div>
+        </div>
+        {lastChecked ? (
+          <div className="faint" style={{ fontSize: 11, whiteSpace: "nowrap" }}>
+            checked {new Date(lastChecked).toLocaleTimeString()}
+          </div>
+        ) : null}
+      </div>
+
+      {detail ? (
+        <div className="muted" style={{ marginTop: 8, fontSize: 12 }}>
+          {detail}
+        </div>
+      ) : null}
+
+      {missing.length > 0 ? (
+        <div style={{ marginTop: 8 }}>
+          <div className="section-title" style={{ marginBottom: 4 }}>
+            Required to enable
+          </div>
+          <div className="flex" style={{ gap: 6, flexWrap: "wrap" }}>
+            {missing.map((m) => (
+              <code key={m}>{m}</code>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default async function SettingsPage() {
-  const status = await api.integrations();
+  const [status, projects] = await Promise.all([api.integrations(), api.listProjects()]);
+  const d = status.diagnostics ?? {};
 
   return (
     <div>
@@ -21,50 +93,44 @@ export default async function SettingsPage() {
         <div>
           <h2>Settings</h2>
           <p>
-            Prefer environment variables for production. Optionally save a GitHub PAT through this UI —
-            it is encrypted at rest (see below). Secrets never appear in API responses or page HTML.
+            Agents pull their live context from these integrations. Each row
+            shows whether the connection is currently operational and — if not
+            — what is missing. Secrets are loaded from <code>.env</code> (or
+            encrypted in Postgres for the GitHub PAT) and never appear in API
+            responses or page HTML.
           </p>
         </div>
       </header>
 
       <div className="card">
         <h3>Integration status</h3>
-        <dl className="kv">
-          <dt>OpenAI (GPT-4o)</dt>
-          <dd>
-            <StatusBadge ok={status.openai} />{" "}
-            <span className="muted">
-              Set <code>OPENAI_API_KEY</code> in <code>.env</code>.
-            </span>
-          </dd>
-          <dt>Jira</dt>
-          <dd>
-            <StatusBadge ok={status.jira} />{" "}
-            <span className="muted">
-              Set <code>JIRA_BASE_URL</code>, <code>JIRA_EMAIL</code>,{" "}
-              <code>JIRA_API_TOKEN</code> to enable real issue fetching.
-            </span>
-          </dd>
-          <dt>GitHub</dt>
-          <dd>
-            <StatusBadge ok={status.github} />{" "}
-            <span className="muted">
-              Set <code>GITHUB_OWNER</code> / <code>GITHUB_REPO</code> (and optionally{" "}
-              <code>GITHUB_TOKEN</code> or save an encrypted PAT below).
-            </span>
-          </dd>
-          <dt>Database</dt>
-          <dd>
-            <span
-              className={`badge ${status.database ? "badge-green" : "badge-red"}`}
-            >
-              {status.database ? "connected" : "down"}
-            </span>{" "}
-            <span className="muted">
-              Postgres + pgvector. Configured via <code>POSTGRES_DSN</code>.
-            </span>
-          </dd>
-        </dl>
+        <div className="list-card" style={{ marginTop: 8 }}>
+          <IntegrationRow
+            name="GitHub"
+            description="Commits, pull requests, issues, and repo metadata."
+            diag={d.github}
+          />
+          <IntegrationRow
+            name="Jira"
+            description="Tickets, statuses, assignees, and comments."
+            diag={d.jira}
+          />
+          <IntegrationRow
+            name="Slack"
+            description="Public channel messages, files, and user directory."
+            diag={d.slack}
+          />
+          <IntegrationRow
+            name="OpenAI"
+            description="Model provider for orchestrator and worker agents."
+            diag={d.openai}
+          />
+          <IntegrationRow
+            name="Database"
+            description="Postgres + pgvector for long-term memory and embeddings."
+            diag={d.database}
+          />
+        </div>
       </div>
 
       <GitHubPatStorage
@@ -72,6 +138,8 @@ export default async function SettingsPage() {
         savedInDatabase={status.github_pat_saved_in_database}
         secretHint={status.github_pat_hint}
       />
+
+      <RepoBootstrapCard hasProjects={projects.length > 0} />
 
       <GitHubBotSetup githubConfigured={status.github} />
 
@@ -144,14 +212,6 @@ export default async function SettingsPage() {
             <strong>agent</strong> — execute approved actions only.
           </li>
         </ul>
-      </div>
-
-      <div className="card">
-        <h3>Working-session transcripts</h3>
-        <p className="muted" style={{ marginTop: 0 }}>
-          Mycelium <strong>does not</strong> monitor your screen. Working-session
-          transcripts must be uploaded explicitly via the Ingestion page.
-        </p>
       </div>
     </div>
   );

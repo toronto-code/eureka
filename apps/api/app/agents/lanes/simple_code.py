@@ -199,7 +199,7 @@ class SimpleCodeLane(BaseLane):
             return result
 
         # Translate plan → ExecutionService's existing executor_output shape.
-        executor_output = _plan_to_executor_output(plan)
+        executor_output = _plan_to_executor_output(plan, ctx=ctx)
         ctx.add_step(result, "simple_code.plan_validated", plan.summary)
 
         try:
@@ -213,16 +213,31 @@ class SimpleCodeLane(BaseLane):
             )
         except Exception as exc:  # noqa: BLE001
             logger.exception("ExecutionService failed: %s", exc)
+            err_text = str(exc)
+            failure = _classify_execution_failure(err_text)
             result.status = "error"
-            result.summary = f"Execution failed: {exc}"
-            ctx.add_step(result, "simple_code.execution_error", str(exc), ok=False)
+            result.summary = failure["summary"]
+            result.blocked_reason = failure["code"]
+            result.extra = {
+                "plan": plan.model_dump(),
+                "failure": failure,
+            }
+            ctx.add_step(result, "simple_code.execution_error", err_text, ok=False)
             return result
 
         result.pr_url = execution.pr_url
         result.jira_comment_url = execution.jira_comment_url
         result.details = plan.pr.body
-        result.status = "completed" if execution.executed else (
-            "blocked" if execution.skipped_reason else "error"
+        # If the GitHub write succeeded (PR exists), don't fail the whole lane
+        # because of follow-up Jira comment/transition errors.
+        non_jira_errors = [
+            err for err in execution.errors if not err.startswith("jira_")
+        ]
+        pr_completed_with_jira_warning = bool(execution.pr_url) and not non_jira_errors
+        result.status = (
+            "completed"
+            if (execution.executed or pr_completed_with_jira_warning)
+            else ("blocked" if execution.skipped_reason else "error")
         )
         if execution.skipped_reason:
             result.blocked_reason = execution.skipped_reason
@@ -233,11 +248,14 @@ class SimpleCodeLane(BaseLane):
             "plan": plan.model_dump(),
             "execution": execution.to_dict(),
         }
+        step_detail = f"pr={execution.pr_url} dry_run={execution.dry_run}"
+        if execution.errors:
+            step_detail += f" warnings={len(execution.errors)}"
         ctx.add_step(
             result,
             "simple_code.execution_completed",
-            f"pr={execution.pr_url} dry_run={execution.dry_run}",
-            ok=execution.executed,
+            step_detail,
+            ok=(execution.executed or pr_completed_with_jira_warning),
         )
         return result
 
@@ -303,7 +321,11 @@ def _fallback_plan(ctx: LaneContext) -> SimpleCodePlan:
     )
 
 
-def _plan_to_executor_output(plan: SimpleCodePlan) -> dict[str, Any]:
+def _plan_to_executor_output(plan: SimpleCodePlan, *, ctx: LaneContext) -> dict[str, Any]:
+    requested_branch = str(ctx.request.extra_hints.get("preferred_branch_name", "")).strip()
+    requested_base = str(ctx.request.extra_hints.get("preferred_base_branch", "")).strip()
+    branch_name = requested_branch or plan.branch_name
+    base_branch = requested_base or "main"
     return {
         "action_taken": "open_pull_request",
         "summary": plan.summary,
@@ -319,8 +341,8 @@ def _plan_to_executor_output(plan: SimpleCodePlan) -> dict[str, Any]:
         "pr": {
             "title": plan.pr.title,
             "description": plan.pr.body,
-            "branch_name": plan.branch_name,
-            "base_branch": "main",
+            "branch_name": branch_name,
+            "base_branch": base_branch,
         },
         "jira_comment": plan.jira_comment,
         "safety_notes": "",
@@ -340,3 +362,36 @@ def _task_snapshot(ctx: LaneContext) -> dict[str, Any]:
 def _slugify(value: str) -> str:
     slug = re.sub(r"[^a-zA-Z0-9]+", "-", value.lower()).strip("-")
     return slug or "task"
+
+
+def _classify_execution_failure(err_text: str) -> dict[str, str]:
+    msg = (err_text or "").lower()
+    if "api.github.com" in msg:
+        if "401" in msg or "unauthorized" in msg:
+            return {
+                "category": "github",
+                "code": "github_auth_failed",
+                "summary": "GitHub execution failed (auth). Jira was not the blocker.",
+            }
+        if "403" in msg or "forbidden" in msg:
+            return {
+                "category": "github",
+                "code": "github_permission_failed",
+                "summary": "GitHub execution failed (permissions). Jira was not the blocker.",
+            }
+        return {
+            "category": "github",
+            "code": "github_execution_failed",
+            "summary": "GitHub execution failed. Jira was not the blocker.",
+        }
+    if "atlassian.net" in msg or "jira" in msg:
+        return {
+            "category": "jira",
+            "code": "jira_execution_failed",
+            "summary": "Jira side-effect failed after planning.",
+        }
+    return {
+        "category": "unknown",
+        "code": "execution_failed",
+        "summary": f"Execution failed: {err_text}",
+    }
