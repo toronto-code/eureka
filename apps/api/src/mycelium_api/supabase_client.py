@@ -66,7 +66,6 @@ async def get_supabase_user(request: Request) -> SupabaseUser:
     auth = request.headers.get("authorization") or request.headers.get("Authorization")
     if not auth:
         if DEV_MODE:
-            logger.warning("auth: no Authorization header — falling back to DEV_USER")
             return DEV_USER
         raise HTTPException(401, "missing Authorization header")
 
@@ -86,7 +85,6 @@ async def get_supabase_user(request: Request) -> SupabaseUser:
         email = getattr(u, "email", None) or (u.get("email") if isinstance(u, dict) else None)
         if not user_id:
             raise HTTPException(401, "invalid JWT (no user id)")
-        logger.info("auth: real user %s (%s)", user_id, email)
         return SupabaseUser(id=str(user_id), email=email, jwt=jwt)
     except HTTPException:
         raise
