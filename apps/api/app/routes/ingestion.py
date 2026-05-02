@@ -7,12 +7,12 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.ingestion import IngestionService, SessionProcessor
+from app.ingestion import IngestionService
 from app.schemas.api import DocumentChunkOut, DocumentDetailOut, DocumentOut
 
 router = APIRouter(prefix="/ingestion", tags=["ingestion"])
 
-ALLOWED_SOURCE_TYPES = {"doc", "transcript", "web_session"}
+ALLOWED_SOURCE_TYPES = {"doc", "transcript"}
 
 
 @router.post("/upload")
@@ -36,43 +36,6 @@ async def upload_document(
         )
 
     service = IngestionService()
-
-    if source_type == "web_session":
-        if not raw_text:
-            raise HTTPException(
-                status_code=400,
-                detail="web_session ingestion requires raw_text (JSON payload).",
-            )
-        try:
-            payload = SessionProcessor().parse_payload(raw_text)
-            processed = SessionProcessor().process(payload)
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        doc_id = service.ingest_document(
-            session=session,
-            source_type="web_session",
-            title=title or processed.title,
-            content=processed.summary_markdown,
-            project_key=project_key,
-            source_id=payload.get("session_id"),
-            metadata={
-                "session_id": payload.get("session_id"),
-                "duration_seconds": processed.duration_seconds,
-                "event_count": processed.event_count,
-                "pages_visited": processed.pages_visited,
-                "workflows": [wf.__dict__ for wf in processed.workflows],
-                "insights": processed.insights,
-                "started_at": payload.get("started_at"),
-                "ended_at": payload.get("ended_at"),
-                "description": processed.description,
-            },
-        )
-        return {
-            "document_id": doc_id,
-            "source_type": "web_session",
-            "workflows": [wf.name for wf in processed.workflows],
-            "event_count": processed.event_count,
-        }
 
     if file is not None:
         content_bytes = await file.read()

@@ -4,7 +4,6 @@ import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 
 import { Sidebar } from "./Sidebar";
-import { SessionRecorder } from "./SessionRecorder";
 import { AuthProvider, useAuth } from "@/lib/auth";
 
 const PUBLIC_PATHS = ["/login"];
@@ -33,7 +32,6 @@ function Inner({ children }: { children: ReactNode }) {
     <div className="app-shell">
       <Sidebar />
       <main className="main">{children}</main>
-      <SessionRecorder />
     </div>
   );
 }

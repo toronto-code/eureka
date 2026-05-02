@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import { RecordingsList } from "@/components/RecordingsList";
 import { api } from "@/lib/api";
 import type { IntegrationDiagnostic } from "@/lib/types";
 
@@ -10,22 +9,22 @@ type SourceKey = "github" | "jira" | "slack";
 
 const SOURCE_META: Record<
   SourceKey,
-  { label: string; description: string; pulls: string[] }
+  { label: string; description: string; logs: string[] }
 > = {
   github: {
-    label: "GitHub",
-    description: "Connected via Personal Access Token.",
-    pulls: ["repos", "commits", "pull requests", "issues"],
+    label: "Git / GitHub",
+    description: "Logs repository activity from the configured GitHub repo.",
+    logs: ["commits", "pull requests", "reviews", "issues"],
   },
   jira: {
     label: "Jira",
-    description: "Connected via API token + email.",
-    pulls: ["issues", "statuses", "assignees", "priority"],
+    description: "Logs ticket movement from the configured Jira workspace.",
+    logs: ["issue creation", "status changes", "comments", "assignees"],
   },
   slack: {
     label: "Slack",
-    description: "Connected via bot/user token.",
-    pulls: ["public channel messages", "files", "user directory"],
+    description: "Logs public-channel collaboration from the configured Slack token.",
+    logs: ["public channel messages", "threads", "files", "user directory"],
   },
 };
 
@@ -66,7 +65,7 @@ function SourceCard({
         </div>
       </div>
       <div className="muted" style={{ marginTop: 8, fontSize: 12 }}>
-        Pulls: {meta.pulls.join(", ")}.
+        Logs: {meta.logs.join(", ")}.
       </div>
       {!ok && diag?.detail ? (
         <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
@@ -78,11 +77,7 @@ function SourceCard({
 }
 
 export default async function IngestionPage() {
-  const [docs, integrations] = await Promise.all([
-    api.listDocuments(),
-    api.integrations(),
-  ]);
-  const sessionDocs = docs.filter((d) => d.source_type === "web_session");
+  const integrations = await api.integrations();
   const d = integrations.diagnostics ?? {};
 
   return (
@@ -91,10 +86,10 @@ export default async function IngestionPage() {
         <div>
           <h2>Ingestion</h2>
           <p>
-            Agents pull context <strong>automatically</strong> from your
-            configured integrations — there is no manual upload. Configure the
-            sources below in <Link href="/settings">Settings</Link>, and watch
-            the live feed in{" "}
+            Agents build context from <strong>work activity logs</strong> in
+            Jira, Git, and Slack. There is no browser or screen recording.
+            Configure the sources below in <Link href="/settings">Settings</Link>,
+            and watch the live feed in{" "}
             <Link href="/incoming">Incoming Data</Link>.
           </p>
         </div>
@@ -106,8 +101,9 @@ export default async function IngestionPage() {
           className="muted"
           style={{ fontSize: 12, marginTop: -4, marginBottom: 10 }}
         >
-          Everything below flows directly into the orchestrator on every chat
-          turn. No copy-paste required.
+          These are artifact-level signals only: tickets, code activity, and
+          public collaboration. Private browser activity, keystrokes, and screen
+          contents are not collected.
         </p>
         <div className="list-card">
           <SourceCard sourceKey="github" diag={d.github} />
@@ -116,36 +112,14 @@ export default async function IngestionPage() {
         </div>
       </div>
 
-      <RecordingsList />
-
       <div className="card">
-        <h3>Ingested web sessions</h3>
-        {sessionDocs.length === 0 ? (
-          <p className="muted">
-            No sessions ingested yet. Use the{" "}
-            <strong>Record session</strong> pill (bottom-right) to capture a
-            workflow and feed it to the agents.
-          </p>
-        ) : (
-          <div className="list-card">
-            {sessionDocs.map((doc) => (
-              <div className="row" key={doc.id}>
-                <div className="flex-col" style={{ gap: 4 }}>
-                  <div className="flex" style={{ gap: 8, flexWrap: "wrap" }}>
-                    <strong>{doc.title}</strong>
-                    <span className="badge badge-purple">web session</span>
-                    <span className="badge badge-neutral">
-                      {doc.chunk_count} chunks
-                    </span>
-                  </div>
-                  <div className="faint" style={{ fontSize: 11 }}>
-                    {new Date(doc.created_at).toLocaleString()}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        <h3>Privacy boundary</h3>
+        <p className="muted">
+          Mycelium logs meaningful work artifacts from approved integrations.
+          It does not record the browser, screen, keystrokes, form values,
+          or private local activity. Slack collection is limited to configured
+          workspace/channel access.
+        </p>
       </div>
     </div>
   );
