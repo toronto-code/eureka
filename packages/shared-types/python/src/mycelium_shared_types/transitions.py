@@ -5,7 +5,15 @@ from __future__ import annotations
 from mycelium_shared_types.agent import AgentTaskStatus
 
 VALID_AGENT_TASK_TRANSITIONS: dict[AgentTaskStatus, set[AgentTaskStatus]] = {
-    AgentTaskStatus.QUEUED: {AgentTaskStatus.RUNNING, AgentTaskStatus.CANCELLED},
+    AgentTaskStatus.QUEUED: {
+        AgentTaskStatus.RUNNING,
+        AgentTaskStatus.PENDING_APPROVAL,
+        AgentTaskStatus.CANCELLED,
+    },
+    AgentTaskStatus.PENDING_APPROVAL: {
+        AgentTaskStatus.RUNNING,
+        AgentTaskStatus.CANCELLED,
+    },
     AgentTaskStatus.RUNNING: {AgentTaskStatus.SUCCEEDED, AgentTaskStatus.FAILED},
     AgentTaskStatus.FAILED: {AgentTaskStatus.RETRIED, AgentTaskStatus.CANCELLED},
     AgentTaskStatus.RETRIED: {AgentTaskStatus.SUCCEEDED, AgentTaskStatus.CANCELLED},

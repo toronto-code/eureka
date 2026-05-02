@@ -1,32 +1,96 @@
 # services/agent-runtime
 
-OpenClaw-based agent execution layer. One OpenClaw instance per employee, managed via Claworc.
+Agent execution layer with pluggable backends. Supports local execution (dev) and OpenClaw/Claworc (production).
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Agent Runtime Service                     │
+├─────────────────────────────────────────────────────────────┤
+│  Task Worker                                                 │
+│    ↓                                                         │
+│  Skill Registry → execute skill with context                 │
+│    ↓                                                         │
+│  Action Executor → propose actions                           │
+│    ↓                                                         │
+│  Permission Guard → check allowlist/blocklist                │
+│    ↓                                                         │
+│  Execution Backend → LocalBackend | OpenClawBackend          │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ## Responsibilities
 
-- Receive a task → execute → return result + audit log entry
-- Maintain a basic skill registry — see `src/mycelium_agent_runtime/skills`
-- Query the knowledge service via internal HTTP. **Never touch Neo4j or Postgres directly.**
+- Receive tasks from `agents.tasks` → execute via skills → publish results to `agents.results`
+- Permission-based action control (Cursor-style allowlist/blocklist)
+- Pluggable execution backends (local dev, OpenClaw production)
+- Query knowledge service via HTTP. **Never touch Neo4j or Postgres directly.**
 
-## Event bus
+## Key Components
 
-| Direction | Topic            | Notes                                                |
-| --------- | ---------------- | ---------------------------------------------------- |
-| Consumes  | `agents.tasks`   | Tasks dispatched by API or workflows.                |
-| Publishes | `agents.results` | Final outcome (`succeeded` / `failed`).              |
+### Permissions (`permissions/`)
 
-## HTTP
+Three-tier permission system for agent actions:
 
-| Method | Path                | Notes                                          |
-| ------ | ------------------- | ---------------------------------------------- |
-| GET    | `/health`           | Standard `HealthCheck` shape.                  |
-| GET    | `/skills`           | List registered skills.                        |
-| POST   | `/agents/spawn`     | Create an OpenClaw instance (one per employee). |
+| Level | Behavior | Examples |
+|-------|----------|----------|
+| `auto` | Execute immediately | `ls`, `cat`, `git status`, read files |
+| `requires_approval` | Queue for human approval | `rm`, `git push`, write files |
+| `blocked` | Never allow | `sudo`, secrets access |
 
-## Env vars
+### Execution Backends (`execution/`)
 
-`OPENCLAW_API_KEY`, `CLAWORC_API_KEY`, `KNOWLEDGE_URL`, `REDIS_URL`, `POSTGRES_DSN`, `DEV_MODE`.
+- **LocalBackend** — runs actions in-process (shell, file ops, git, HTTP)
+- **OpenClawBackend** — delegates to OpenClaw API (production)
+
+Set `EXECUTION_BACKEND=local` or `EXECUTION_BACKEND=openclaw`.
+
+### Skills (`skills/`)
+
+| Skill | Description |
+|-------|-------------|
+| `shell` | Execute shell commands |
+| `file_ops` | Read/write/delete files |
+| `git` | Git version control |
+| `search` | Grep/find files |
+| `reasoning` | Plan multi-step tasks |
+| `summarize` | Summarize content |
+
+## Event Bus
+
+| Direction | Topic | Notes |
+|-----------|-------|-------|
+| Consumes | `agents.tasks` | Tasks from API or workflows |
+| Publishes | `agents.results` | Outcome (`succeeded`/`failed`/`pending_approval`) |
+
+## HTTP Endpoints
+
+| Method | Path | Notes |
+|--------|------|-------|
+| GET | `/health` | Standard `HealthCheck` shape |
+| GET | `/skills` | List registered skills |
+| GET | `/permissions` | List permission rules |
+| POST | `/agents/spawn` | Create an OpenClaw instance |
+| POST | `/actions/check` | Check if an action would be allowed |
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `EXECUTION_BACKEND` | `local` | `local` or `openclaw` |
+| `WORKING_DIRECTORY` | `/tmp/agent-workspace` | Sandbox directory for local execution |
+| `OPENCLAW_API_KEY` | - | OpenClaw API key (production) |
+| `OPENCLAW_API_URL` | `https://api.openclaw.ai` | OpenClaw API endpoint |
+| `CLAWORC_API_KEY` | - | Claworc API key (production) |
+| `CLAWORC_API_URL` | `https://api.claworc.ai` | Claworc API endpoint |
+| `KNOWLEDGE_URL` | `http://knowledge:8001` | Knowledge service URL |
+| `REDIS_URL` | `redis://redis:6379/0` | Redis for event bus |
+| `DEV_MODE` | `true` | Enable dev mode (relaxed auth) |
 
 ## DEV_MODE
 
-When `DEV_MODE=true`, agent execution is stubbed: it sleeps briefly and emits a fake "succeeded" result so the rest of the pipeline can be developed without API keys.
+When `DEV_MODE=true`:
+- Auth is disabled
+- LocalBackend is used by default
+- Skills return real results (via local execution) instead of stubs

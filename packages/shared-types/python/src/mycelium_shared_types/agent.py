@@ -31,13 +31,15 @@ class Agent(BaseModel):
 class AgentTaskStatus(str, Enum):
     """Lifecycle states. Transitions are strict — see ``transitions.py``.
 
-    queued → running
+    queued → running | pending_approval | cancelled
+    pending_approval → running | cancelled
     running → succeeded | failed
     failed → retried | cancelled
     retried → succeeded | cancelled
     """
 
     QUEUED = "queued"
+    PENDING_APPROVAL = "pending_approval"
     RUNNING = "running"
     SUCCEEDED = "succeeded"
     FAILED = "failed"

@@ -12,13 +12,15 @@ export interface Agent {
 /**
  * Lifecycle states. Transitions are strict — see {@link VALID_AGENT_TASK_TRANSITIONS}.
  *
- *   queued    → running
- *   running   → succeeded | failed
- *   failed    → retried   | cancelled
- *   retried   → succeeded | cancelled
+ *   queued           → running | pending_approval | cancelled
+ *   pending_approval → running | cancelled
+ *   running          → succeeded | failed
+ *   failed           → retried   | cancelled
+ *   retried          → succeeded | cancelled
  */
 export type AgentTaskStatus =
   | "queued"
+  | "pending_approval"
   | "running"
   | "succeeded"
   | "failed"
