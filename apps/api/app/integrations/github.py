@@ -382,7 +382,7 @@ def get_github_client() -> GitHubClient:
     settings = get_settings()
     return GitHubClient(
         token=settings.github_token,
-        owner=settings.github_owner,
+        owner=settings.effective_github_owner,
         repo=settings.github_repo,
         default_base_branch=settings.github_default_base_branch,
         allowed_write_paths=settings.allowed_write_paths,

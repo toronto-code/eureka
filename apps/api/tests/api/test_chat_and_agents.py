@@ -70,7 +70,7 @@ def test_chat_dispatches_with_default_agent(chat_app: FastAPI, captured_tasks: l
     kw = captured_tasks[0]
     assert kw["agent_id"] == body["agent_id"]
     assert kw["task_id"] == body["task_id"]
-    assert kw["agent_type"] == "chat"
+    assert kw["agent_type"] == "project_orchestrator"
     assert kw["input_data"]["prompt"] == "hello world"
 
 
@@ -79,6 +79,24 @@ def test_chat_accepts_custom_agent_id(chat_app: FastAPI, captured_tasks: list) -
     r = client.post("/chat", json={"prompt": "x", "agent_id": "custom-agent"})
     assert r.status_code == 200
     assert r.json()["agent_id"] == "custom-agent"
+
+
+def test_chat_passes_project_data_and_legacy_agent_type(
+    chat_app: FastAPI, captured_tasks: list
+) -> None:
+    client = TestClient(chat_app)
+    r = client.post(
+        "/chat",
+        json={
+            "prompt": "hi",
+            "agent_type": "chat",
+            "project_data": {"repos": ["a/b"], "phase": "discovery"},
+        },
+    )
+    assert r.status_code == 200
+    kw = captured_tasks[0]
+    assert kw["agent_type"] == "chat"
+    assert kw["input_data"]["project_data"] == {"repos": ["a/b"], "phase": "discovery"}
 
 
 def test_create_agent_task_under_path(agents_app: FastAPI, captured_tasks: list) -> None:

@@ -1,3 +1,4 @@
+import { GitHubBotSetup } from "@/components/GitHubBotSetup";
 import { api } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
@@ -64,6 +65,8 @@ export default async function SettingsPage() {
           </dd>
         </dl>
       </div>
+
+      <GitHubBotSetup githubConfigured={status.github} />
 
       <div className="card">
         <h3>Autonomous execution</h3>

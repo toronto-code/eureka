@@ -92,6 +92,7 @@ from mycelium_agent_runtime.skills.reasoning import (
     PlanSkill,
     SummarizeSkill,
 )
+from mycelium_agent_runtime.skills.project_orchestrator import ProjectOrchestratorSkill
 
 registry.register(ShellSkill())
 registry.register(MultiShellSkill())
@@ -109,6 +110,7 @@ registry.register(SearchSkill())
 registry.register(ReasoningSkill())
 registry.register(PlanSkill())
 registry.register(SummarizeSkill())
+registry.register(ProjectOrchestratorSkill())
 
 
 # ---- Legacy stub skills (kept for backward compatibility) ------------------

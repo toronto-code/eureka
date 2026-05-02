@@ -69,12 +69,17 @@ Set `EXECUTION_BACKEND=local` or `EXECUTION_BACKEND=openclaw`.
 
 | Skill | Description |
 |-------|-------------|
+| `project_orchestrator` | Top-level orchestrator: reads `project_data`, plans a team, runs specialist skills |
 | `shell` | Execute shell commands |
 | `file_ops` | Read/write/delete files |
 | `git` | Git version control |
 | `search` | Grep/find files |
 | `reasoning` | Plan multi-step tasks |
 | `summarize` | Summarize content |
+
+### Agent personas (`agents/catalog.py`)
+
+Logical roles (orchestrator + specialists). List at **GET `/agents/personas`**. The orchestrator skill delegates to `reasoning`, `plan`, `summarize`, `onboard`, etc., using keyword routing until an LLM planner is wired.
 
 ## Event Bus
 

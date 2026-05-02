@@ -1,5 +1,4 @@
-import Link from "next/link";
-
+import { OrchestrationRunLink } from "@/components/OrchestrationRunLink";
 import { RiskBadge } from "@/components/RiskBadge";
 import { StatusDot } from "@/components/StatusDot";
 import type { AgentRun, RiskLevel } from "@/lib/types";
@@ -17,6 +16,10 @@ export function AgentRunCard({ run }: { run: AgentRun }) {
   const risk =
     (run.structured_output_json?.["risk_level"] as RiskLevel | undefined) ??
     null;
+  const flowRunId =
+    run.agent_type === "orchestrator"
+      ? run.id
+      : (run.orchestrator_run_id ?? run.id);
   return (
     <div className="row">
       <div className="flex-col" style={{ flex: 1, gap: 4 }}>
@@ -33,15 +36,9 @@ export function AgentRunCard({ run }: { run: AgentRun }) {
           model {run.model} · runtime {elapsed(run)} · {new Date(run.created_at).toLocaleString()}
         </div>
       </div>
-      {run.orchestrator_run_id ? (
-        <Link href={`/orchestration?run=${run.orchestrator_run_id}`} className="btn">
-          View flow
-        </Link>
-      ) : (
-        <Link href={`/orchestration?run=${run.id}`} className="btn">
-          View flow
-        </Link>
-      )}
+      <OrchestrationRunLink runId={flowRunId} className="btn">
+        View flow
+      </OrchestrationRunLink>
     </div>
   );
 }

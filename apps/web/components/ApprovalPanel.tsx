@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
 import { RiskBadge } from "@/components/RiskBadge";
 import type { ApprovalRecord, RiskLevel } from "@/lib/types";
@@ -24,7 +24,7 @@ export function ApprovalPanel({
   const [decision, setDecision] = useState<string | null>(
     approval?.status ?? null,
   );
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
 
   if (!approval) {
     return (
@@ -36,7 +36,8 @@ export function ApprovalPanel({
   }
 
   async function decide(kind: "approve" | "reject") {
-    startTransition(async () => {
+    setPending(true);
+    try {
       const res = await fetch(`/api/tasks/${taskId}/${kind}`, {
         method: "POST",
         body: JSON.stringify({ approver: "demo-user", notes }),
@@ -46,7 +47,9 @@ export function ApprovalPanel({
         const json = await res.json();
         setDecision(json.approval_status ?? (kind === "approve" ? "APPROVED" : "REJECTED"));
       }
-    });
+    } finally {
+      setPending(false);
+    }
   }
 
   return (
@@ -86,7 +89,7 @@ export function ApprovalPanel({
         <div className="flex">
           <button
             className="btn btn-primary"
-            onClick={() => decide("approve")}
+            onClick={() => void decide("approve")}
             disabled={
               decision === "APPROVED" || decision === "REJECTED" || pending
             }
@@ -95,7 +98,7 @@ export function ApprovalPanel({
           </button>
           <button
             className="btn btn-danger"
-            onClick={() => decide("reject")}
+            onClick={() => void decide("reject")}
             disabled={
               decision === "APPROVED" || decision === "REJECTED" || pending
             }

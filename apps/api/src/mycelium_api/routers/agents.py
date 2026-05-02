@@ -17,7 +17,15 @@ from mycelium_shared_types.correlation import derive_correlation_id
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 
-_TASK_AGENT_CAPS = ["chat", "summarize", "triage", "onboard"]
+_TASK_AGENT_CAPS = [
+    "project_orchestrator",
+    "chat",
+    "summarize",
+    "triage",
+    "onboard",
+    "reasoning",
+    "plan",
+]
 
 
 class TaskCreate(BaseModel):

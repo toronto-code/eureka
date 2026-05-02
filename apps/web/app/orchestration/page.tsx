@@ -4,6 +4,8 @@ import { AgentOutputViewer } from "@/components/AgentOutputViewer";
 import { AuditLogTimeline } from "@/components/AuditLogTimeline";
 import { ExecutionPanel } from "@/components/ExecutionPanel";
 import { OrchestrationFlow } from "@/components/OrchestrationFlow";
+import { OrchestrationQuickNav } from "@/components/OrchestrationQuickNav";
+import { OrchestrationRunLink } from "@/components/OrchestrationRunLink";
 import { OrchestratorOverview } from "@/components/OrchestratorOverview";
 import { RiskBadge } from "@/components/RiskBadge";
 import { RunDemoButton } from "@/components/RunDemoButton";
@@ -38,7 +40,10 @@ export default async function OrchestrationPage({
             the demo to populate a flow.
           </p>
         </div>
-        <RunDemoButton />
+        <div className="flex" style={{ gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+          <OrchestrationQuickNav />
+          <RunDemoButton />
+        </div>
       </header>
       <div className="card">
         <h3>Jira watcher</h3>
@@ -68,7 +73,10 @@ export default async function OrchestrationPage({
             <h2>Orchestration</h2>
             <p className="muted">Run not found.</p>
           </div>
-          <RunDemoButton />
+          <div className="flex" style={{ gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+            <OrchestrationQuickNav />
+            <RunDemoButton />
+          </div>
         </header>
       </div>
     );
@@ -92,7 +100,10 @@ export default async function OrchestrationPage({
             the full multi-agent execution flow.
           </p>
         </div>
-        <RunDemoButton />
+        <div className="flex" style={{ gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+          <OrchestrationQuickNav />
+          <RunDemoButton />
+        </div>
       </header>
 
       <div className="card">
@@ -101,8 +112,8 @@ export default async function OrchestrationPage({
           {orchestratorRuns.slice(0, 8).map((r) => {
             const active = r.id === selectedId;
             return (
-              <Link
-                href={`/orchestration?run=${r.id}`}
+              <OrchestrationRunLink
+                runId={r.id}
                 key={r.id}
                 className="row"
                 style={
@@ -129,7 +140,7 @@ export default async function OrchestrationPage({
                 <div className="muted" style={{ fontSize: 12 }}>
                   {new Date(r.created_at).toLocaleString()}
                 </div>
-              </Link>
+              </OrchestrationRunLink>
             );
           })}
         </div>
@@ -191,7 +202,7 @@ export default async function OrchestrationPage({
             </div>
           </div>
 
-          <TaskBrief output={orchestratorOutput} />
+          <TaskBrief output={orchestratorOutput} taskDbId={run.task_id} />
 
           <div className="card">
             <h3>Orchestrator decision log</h3>

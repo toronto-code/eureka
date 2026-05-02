@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
 export function IngestionUploader() {
   const router = useRouter();
@@ -10,31 +10,32 @@ export function IngestionUploader() {
   const [sourceType, setSourceType] = useState<"doc" | "transcript">("doc");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
 
-  function submit() {
+  async function submit() {
     setError(null);
     setSuccess(null);
-    startTransition(async () => {
-      try {
-        const fd = new FormData();
-        fd.append("title", title || "Untitled");
-        fd.append("source_type", sourceType);
-        fd.append("raw_text", text);
-        const res = await fetch("/api/ingestion/upload", {
-          method: "POST",
-          body: fd,
-        });
-        if (!res.ok) throw new Error(`Upload failed (${res.status})`);
-        const json = (await res.json()) as { document_id: string };
-        setSuccess(`Ingested ${json.document_id}`);
-        setText("");
-        setTitle("");
-        router.refresh();
-      } catch (err) {
-        setError(String(err));
-      }
-    });
+    setPending(true);
+    try {
+      const fd = new FormData();
+      fd.append("title", title || "Untitled");
+      fd.append("source_type", sourceType);
+      fd.append("raw_text", text);
+      const res = await fetch("/api/ingestion/upload", {
+        method: "POST",
+        body: fd,
+      });
+      if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+      const json = (await res.json()) as { document_id: string };
+      setSuccess(`Ingested ${json.document_id}`);
+      setText("");
+      setTitle("");
+      router.refresh();
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setPending(false);
+    }
   }
 
   return (
@@ -73,7 +74,7 @@ export function IngestionUploader() {
         <div className="flex">
           <button
             className="btn btn-primary"
-            onClick={submit}
+            onClick={() => void submit()}
             disabled={pending || !text.trim()}
           >
             {pending ? "Uploading…" : "Ingest"}
