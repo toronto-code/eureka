@@ -8,7 +8,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -18,12 +18,18 @@ from app.integrations.github_token import is_usable_github_token, resolve_github
 from app.schemas.api import IntegrationDiagnostic, IntegrationStatusOut
 from app.services.github_pat_store import github_pat_row
 from app.memory.project_data import ProjectDataService
+from app.services.local_user_data_store import get_orchestrator_chat_history_file_info
+from app.models import Project
 
 router = APIRouter(tags=["system"])
 
 
 class RepoBootstrapIn(BaseModel):
     repo_url: str | None = None
+
+
+class HistoryFileRequest(BaseModel):
+    project_id: str | None = None
 
 
 def _parse_repo_url(repo_url: str) -> tuple[str, str] | None:
@@ -281,6 +287,27 @@ def bootstrap_repository(
         "repository": f"{owner}/{repo}",
         "github_token_from_env": bool((settings.github_token or "").strip()),
         "github_webhook_from_env": bool((settings.github_webhook_secret or "").strip()),
+    }
+
+
+@router.post("/settings/orchestrator/history-file")
+def orchestrator_history_file(
+    body: HistoryFileRequest,
+    session: Session = Depends(get_db),
+) -> dict[str, Any]:
+    project: Project | None = None
+    if body.project_id:
+        project = session.get(Project, body.project_id)
+    if project is None:
+        project = session.execute(select(Project).order_by(Project.created_at.desc())).scalars().first()
+    if project is None:
+        return {"ok": False, "error": "no_project"}
+    info = get_orchestrator_chat_history_file_info(project.id, project_slug=project.slug)
+    return {
+        "ok": True,
+        "project_id": project.id,
+        "project_slug": project.slug,
+        **info,
     }
 
 

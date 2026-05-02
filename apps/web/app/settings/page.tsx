@@ -1,5 +1,6 @@
 import { GitHubBotSetup } from "@/components/GitHubBotSetup";
 import { GitHubPatStorage } from "@/components/GitHubPatStorage";
+import { HistoryFileViewerCard } from "@/components/HistoryFileViewerCard";
 import { RepoBootstrapCard } from "@/components/RepoBootstrapCard";
 import { api } from "@/lib/api";
 import type { IntegrationDiagnostic } from "@/lib/types";
@@ -140,6 +141,7 @@ export default async function SettingsPage() {
       />
 
       <RepoBootstrapCard hasProjects={projects.length > 0} />
+      <HistoryFileViewerCard projects={projects} />
 
       <GitHubBotSetup githubConfigured={status.github} />
 

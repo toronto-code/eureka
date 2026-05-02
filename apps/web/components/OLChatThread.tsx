@@ -64,6 +64,49 @@ export function OLChatThread({ projects, defaultProjectId }: Props) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
+  async function persistMsg(msg: Msg) {
+    if (!projectId) return;
+    const payload =
+      msg.role === "user"
+        ? { role: "user", text: msg.text, ts: msg.ts }
+        : {
+            role: "assistant",
+            text: msg.reasoning || msg.error || "",
+            ts: msg.ts,
+            status: msg.status,
+            runId: msg.runId,
+            route: msg.route,
+            risk: msg.risk,
+            laneStatus: msg.laneStatus,
+            reasoning: msg.reasoning,
+            prUrl: msg.prUrl,
+            jiraCommentUrl: msg.jiraCommentUrl,
+            blockedReason: msg.blockedReason,
+            error: msg.error,
+          };
+    await fetch(`/api/ol/history?project_id=${projectId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }).catch(() => null);
+  }
+
+  useEffect(() => {
+    if (!projectId) return;
+    let cancelled = false;
+    (async () => {
+      const res = await fetch(`/api/ol/history?project_id=${projectId}`).catch(() => null);
+      if (!res?.ok) return;
+      const payload = (await res.json().catch(() => ({}))) as { messages?: Msg[] };
+      if (cancelled) return;
+      const items = Array.isArray(payload.messages) ? payload.messages : [];
+      setMessages(items);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
+
   useEffect(() => {
     const ta = textareaRef.current;
     if (ta) {
@@ -90,6 +133,7 @@ export function OLChatThread({ projects, defaultProjectId }: Props) {
       status: "thinking",
     };
     setMessages((prev) => [...prev, userMsg, assistantMsg]);
+    void persistMsg(userMsg);
     setInput("");
     setBusy(true);
 
@@ -104,7 +148,7 @@ export function OLChatThread({ projects, defaultProjectId }: Props) {
       const r = payload.run;
       setMessages((prev) => {
         const copy = [...prev];
-        copy[copy.length - 1] = {
+        const doneMsg: AssistantMsg = {
           role: "assistant",
           ts: assistantMsg.ts,
           status: "done",
@@ -117,17 +161,21 @@ export function OLChatThread({ projects, defaultProjectId }: Props) {
           jiraCommentUrl: r.jira_comment_url,
           blockedReason: r.blocked_reason,
         };
+        copy[copy.length - 1] = doneMsg;
+        void persistMsg(doneMsg);
         return copy;
       });
     } catch (err) {
       setMessages((prev) => {
         const copy = [...prev];
-        copy[copy.length - 1] = {
+        const errMsg: AssistantMsg = {
           role: "assistant",
           ts: assistantMsg.ts,
           status: "error",
           error: err instanceof Error ? err.message : String(err),
         };
+        copy[copy.length - 1] = errMsg;
+        void persistMsg(errMsg);
         return copy;
       });
     } finally {

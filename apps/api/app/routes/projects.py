@@ -5,6 +5,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
@@ -24,6 +25,8 @@ from app.schemas.api import (
     SyncResultOut,
 )
 from app.services.local_user_data_store import (
+    append_orchestrator_chat_message,
+    load_orchestrator_chat_history,
     list_orchestrator_run_snapshots,
     save_orchestrator_run_snapshot,
 )
@@ -33,6 +36,22 @@ from app.services.sync_service import SyncService
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/projects", tags=["projects"])
+
+
+class OLChatMessageIn(BaseModel):
+    role: str
+    text: str
+    ts: int
+    status: str | None = None
+    runId: str | None = None
+    route: str | None = None
+    risk: str | None = None
+    laneStatus: str | None = None
+    reasoning: str | None = None
+    prUrl: str | None = None
+    jiraCommentUrl: str | None = None
+    blockedReason: str | None = None
+    error: str | None = None
 
 
 @router.get("", response_model=list[ProjectOut])
@@ -132,6 +151,31 @@ def list_orchestrator_runs(
             by_id[row_id] = row
     merged = sorted(by_id.values(), key=lambda x: str(x.get("created_at") or ""), reverse=True)[:limit]
     return [OrchestratorRunOut.model_validate(r) for r in merged]
+
+
+@router.get("/{project_id}/orchestrator/chat-history")
+def get_ol_chat_history(project_id: str, db: Session = Depends(get_db)) -> dict[str, Any]:
+    project = db.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project_not_found")
+    return {"messages": load_orchestrator_chat_history(project_id, project_slug=project.slug)}
+
+
+@router.post("/{project_id}/orchestrator/chat-history")
+def append_ol_chat_history(
+    project_id: str,
+    body: OLChatMessageIn,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    project = db.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project_not_found")
+    append_orchestrator_chat_message(
+        project_id,
+        body.model_dump(),
+        project_slug=project.slug,
+    )
+    return {"ok": True}
 
 
 # -----------------------------------------------------------------------------

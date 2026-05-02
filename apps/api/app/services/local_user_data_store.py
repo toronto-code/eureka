@@ -31,6 +31,12 @@ def _runs_dir() -> Path:
     return path
 
 
+def _chat_dir() -> Path:
+    path = _app_support_dir() / "orchestrator-chat"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 def save_orchestrator_run_snapshot(
     run_data: dict[str, Any],
     *,
@@ -76,3 +82,80 @@ def list_orchestrator_run_snapshots(
             out.append(row)
     out.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
     return out[:limit]
+
+
+def _chat_key(project_id: str, project_slug: str | None = None) -> str:
+    if (project_slug or "").strip():
+        return f"slug-{project_slug.strip().lower()}"
+    return f"id-{project_id.strip().lower()}"
+
+
+def _chat_file(project_id: str, project_slug: str | None = None) -> Path:
+    return _chat_dir() / f"{_chat_key(project_id, project_slug)}.json"
+
+
+def load_orchestrator_chat_history(
+    project_id: str,
+    *,
+    project_slug: str | None = None,
+) -> list[dict[str, Any]]:
+    candidates = [
+        _chat_file(project_id, project_slug),
+        _chat_file(project_id, None),
+    ]
+    path = next((p for p in candidates if p.exists()), None)
+    if path is None:
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+
+def append_orchestrator_chat_message(
+    project_id: str,
+    message: dict[str, Any],
+    *,
+    project_slug: str | None = None,
+    max_items: int = 300,
+) -> None:
+    if not isinstance(message, dict):
+        return
+    row = {
+        "role": str(message.get("role") or ""),
+        "text": str(message.get("text") or ""),
+        "ts": int(message.get("ts") or 0),
+        "status": message.get("status"),
+        "runId": message.get("runId"),
+        "route": message.get("route"),
+        "risk": message.get("risk"),
+        "laneStatus": message.get("laneStatus"),
+        "reasoning": message.get("reasoning"),
+        "prUrl": message.get("prUrl"),
+        "jiraCommentUrl": message.get("jiraCommentUrl"),
+        "blockedReason": message.get("blockedReason"),
+        "error": message.get("error"),
+    }
+    path = _chat_file(project_id, project_slug)
+    items = load_orchestrator_chat_history(project_id, project_slug=project_slug)
+    items.append(row)
+    items = items[-max_items:]
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(items, ensure_ascii=True, indent=2), encoding="utf-8")
+    tmp.replace(path)
+
+
+def get_orchestrator_chat_history_file_info(
+    project_id: str,
+    *,
+    project_slug: str | None = None,
+) -> dict[str, Any]:
+    path = _chat_file(project_id, project_slug)
+    data = load_orchestrator_chat_history(project_id, project_slug=project_slug)
+    return {
+        "path": str(path),
+        "exists": path.exists(),
+        "messages_count": len(data),
+        "messages": data,
+    }
