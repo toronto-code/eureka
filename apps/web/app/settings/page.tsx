@@ -1,5 +1,6 @@
 import { GitHubBotSetup } from "@/components/GitHubBotSetup";
 import { GitHubPatStorage } from "@/components/GitHubPatStorage";
+import { RepoBootstrapCard } from "@/components/RepoBootstrapCard";
 import { api } from "@/lib/api";
 import type { IntegrationDiagnostic } from "@/lib/types";
 
@@ -83,7 +84,7 @@ function IntegrationRow({
 }
 
 export default async function SettingsPage() {
-  const status = await api.integrations();
+  const [status, projects] = await Promise.all([api.integrations(), api.listProjects()]);
   const d = status.diagnostics ?? {};
 
   return (
@@ -137,6 +138,8 @@ export default async function SettingsPage() {
         savedInDatabase={status.github_pat_saved_in_database}
         secretHint={status.github_pat_hint}
       />
+
+      <RepoBootstrapCard hasProjects={projects.length > 0} />
 
       <GitHubBotSetup githubConfigured={status.github} />
 

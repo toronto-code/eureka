@@ -3,9 +3,11 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timezone
+import re
 from typing import Any
 
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -14,8 +16,24 @@ from app.crypto_credentials import fernet_from_settings
 from app.db import get_db
 from app.schemas.api import IntegrationDiagnostic, IntegrationStatusOut
 from app.services.github_pat_store import github_pat_row
+from app.memory.project_data import ProjectDataService
 
 router = APIRouter(tags=["system"])
+
+
+class RepoBootstrapIn(BaseModel):
+    repo_url: str | None = None
+
+
+def _parse_repo_url(repo_url: str) -> tuple[str, str] | None:
+    m = re.match(
+        r"^https?://github\.com/([^/\s]+)/([^/\s]+?)(?:\.git)?/?$",
+        repo_url.strip(),
+        flags=re.IGNORECASE,
+    )
+    if not m:
+        return None
+    return m.group(1), m.group(2)
 
 
 @router.get("/health")
@@ -213,6 +231,56 @@ def current_project_data() -> dict[str, Any]:
     from app.seed import build_demo_project_data
 
     return build_demo_project_data().model_dump()
+
+
+@router.post("/settings/repository/bootstrap")
+def bootstrap_repository(
+    body: RepoBootstrapIn,
+    session: Session = Depends(get_db),
+) -> dict[str, Any]:
+    settings = get_settings()
+    owner = settings.effective_github_owner
+    repo = settings.github_repo
+
+    if body.repo_url:
+        parsed = _parse_repo_url(body.repo_url)
+        if not parsed:
+            return {"ok": False, "error": "invalid_repo_url"}
+        owner, repo = parsed
+
+    if not owner or not repo:
+        return {
+            "ok": False,
+            "error": "missing_repo_coordinates",
+            "hint": "Set GITHUB_OWNER/GITHUB_REPO in .env or provide repo_url.",
+        }
+
+    pd = ProjectDataService()
+    slug = re.sub(r"[^a-z0-9]+", "-", repo.lower()).strip("-") or "project"
+    project = pd.ensure_project(
+        session,
+        slug=slug,
+        name=repo.replace("-", " ").title(),
+        description=f"Linked from GitHub: {owner}/{repo}",
+    )
+    repository = pd.ensure_repository(
+        session,
+        project_id=project.id,
+        owner=owner,
+        name=repo,
+        default_branch=settings.github_default_base_branch or "main",
+        html_url=f"https://github.com/{owner}/{repo}",
+    )
+    session.commit()
+    return {
+        "ok": True,
+        "project_id": project.id,
+        "project_slug": project.slug,
+        "repository_id": repository.id,
+        "repository": f"{owner}/{repo}",
+        "github_token_from_env": bool((settings.github_token or "").strip()),
+        "github_webhook_from_env": bool((settings.github_webhook_secret or "").strip()),
+    }
 
 
 @router.get("/observability")

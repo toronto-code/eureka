@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.db import get_db
 from app.memory.project_data import ProjectDataService
 from app.memory.retrieval import RetrievalQuery
@@ -22,6 +23,10 @@ from app.schemas.api import (
     RetrievedChunkOut,
     SyncResultOut,
 )
+from app.services.local_user_data_store import (
+    list_orchestrator_run_snapshots,
+    save_orchestrator_run_snapshot,
+)
 from app.services.ol_service import OLService
 from app.services.sync_service import SyncService
 
@@ -33,6 +38,12 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 @router.get("", response_model=list[ProjectOut])
 def list_projects(db: Session = Depends(get_db)) -> list[ProjectOut]:
     rows = db.execute(select(Project).order_by(desc(Project.created_at))).scalars().all()
+    if not rows and get_settings().enable_demo_seed:
+        # Self-heal when startup seeding was skipped (e.g. DB not ready at boot).
+        from app.seed import seed_database
+
+        seed_database(db)
+        rows = db.execute(select(Project).order_by(desc(Project.created_at))).scalars().all()
     return [ProjectOut.model_validate(p) for p in rows]
 
 
@@ -55,7 +66,8 @@ def run_orchestrator(
     body: OLRunRequest,
     db: Session = Depends(get_db),
 ) -> OLRunDetailOut:
-    if not db.get(Project, project_id):
+    project = db.get(Project, project_id)
+    if not project:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project_not_found")
     service = OLService()
     try:
@@ -72,13 +84,18 @@ def run_orchestrator(
             extra_hints=body.extra_hints,
         )
         db.commit()
+        run_out = OrchestratorRunOut.model_validate(outcome.run)
+        save_orchestrator_run_snapshot(
+            run_out.model_dump(mode="json"),
+            project_slug=project.slug,
+        )
     except Exception as exc:  # noqa: BLE001
         db.rollback()
         logger.exception("OL run failed: %s", exc)
         raise HTTPException(status_code=500, detail=f"ol_run_failed: {exc}") from exc
 
     return OLRunDetailOut(
-        run=OrchestratorRunOut.model_validate(outcome.run),
+        run=run_out,
         retrieved_chunks=[
             RetrievedChunkOut(**c.to_dict()) for c in outcome.retrieved_chunks
         ],
@@ -93,11 +110,28 @@ def list_orchestrator_runs(
     limit: int = 50,
     db: Session = Depends(get_db),
 ) -> list[OrchestratorRunOut]:
-    if not db.get(Project, project_id):
+    project = db.get(Project, project_id)
+    if not project:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project_not_found")
     service = OLService()
     runs = service.list_runs(db, project_id=project_id, limit=limit)
-    return [OrchestratorRunOut.model_validate(r) for r in runs]
+    db_rows = [OrchestratorRunOut.model_validate(r).model_dump(mode="json") for r in runs]
+    local_rows = list_orchestrator_run_snapshots(
+        project_id=project_id,
+        project_slug=project.slug,
+        limit=limit,
+    )
+    by_id: dict[str, dict[str, Any]] = {}
+    for row in local_rows:
+        row_id = str(row.get("id") or "")
+        if row_id:
+            by_id[row_id] = row
+    for row in db_rows:
+        row_id = str(row.get("id") or "")
+        if row_id:
+            by_id[row_id] = row
+    merged = sorted(by_id.values(), key=lambda x: str(x.get("created_at") or ""), reverse=True)[:limit]
+    return [OrchestratorRunOut.model_validate(r) for r in merged]
 
 
 # -----------------------------------------------------------------------------

@@ -1,3 +1,7 @@
+ "use client";
+
+import { useMemo, useState } from "react";
+
 import type {
   LaneResultDto,
   LaneStep,
@@ -28,6 +32,64 @@ export function OLRunDetail({
 }) {
   const plan = asRetrievalPlan(run.retrieval_plan);
   const lane = asLaneResult(run.lane_result);
+  const planFiles = readPlanFiles(lane);
+  const [branchChoice, setBranchChoice] = useState(
+    planFiles.defaultBranch || "ai/manual-review",
+  );
+  const [customBranch, setCustomBranch] = useState("");
+  const [rerunBusy, setRerunBusy] = useState(false);
+  const [rerunMsg, setRerunMsg] = useState<string | null>(null);
+  const chunkByPath = useMemo(() => {
+    const out = new Map<string, string>();
+    const grouped = new Map<string, RetrievedChunkDto[]>();
+    for (const c of chunks) {
+      if (!c.file_path) continue;
+      const arr = grouped.get(c.file_path) || [];
+      arr.push(c);
+      grouped.set(c.file_path, arr);
+    }
+    for (const [path, arr] of grouped.entries()) {
+      arr.sort((a, b) => (a.start_line ?? 0) - (b.start_line ?? 0));
+      out.set(path, arr.map((x) => x.chunk_text).join("\n"));
+    }
+    return out;
+  }, [chunks]);
+
+  async function rerunWithBranch() {
+    const chosenBranch =
+      branchChoice === "__custom__" ? customBranch.trim() : branchChoice.trim();
+    if (!chosenBranch) {
+      setRerunMsg("Enter a branch name first.");
+      return;
+    }
+    setRerunBusy(true);
+    setRerunMsg(null);
+    try {
+      const res = await fetch(`/api/ol/run?project_id=${run.project_id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_request: run.user_request,
+          origin: "manual",
+          acceptance_criteria: [],
+          extra_hints: {
+            preferred_branch_name: chosenBranch,
+          },
+        }),
+      });
+      if (!res.ok) throw new Error(`rerun failed (${res.status})`);
+      const payload = (await res.json()) as { run?: { id?: string } };
+      const runId = payload.run?.id;
+      setRerunMsg(
+        runId ? `Started rerun on branch '${chosenBranch}': ${runId}` : `Started rerun on branch '${chosenBranch}'.`,
+      );
+    } catch (err) {
+      setRerunMsg(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRerunBusy(false);
+    }
+  }
+
   return (
     <div className="ol-run-detail">
       <Header run={run} />
@@ -181,6 +243,69 @@ export function OLRunDetail({
         )}
       </section>
 
+      {planFiles.files.length > 0 && (
+        <section>
+          <h2>Code review (proposed changes)</h2>
+          <div className="ol-diff-list">
+            {planFiles.files.map((f) => {
+              const oldText = chunkByPath.get(f.path) || "";
+              const rows = buildDiffRows(oldText, f.content);
+              return (
+                <article key={f.path} className="ol-diff-file">
+                  <div className="ol-diff-file-head">
+                    <span className="tag tag-grey">{f.operation}</span>
+                    <code>{f.path}</code>
+                  </div>
+                  <pre className="ol-diff-scroll">
+                    {rows.map((row, idx) => (
+                      <div key={`${f.path}-${idx}`} className={`ol-diff-row ${row.kind}`}>
+                        <span className="ol-diff-prefix">{row.prefix}</span>
+                        <span className="ol-diff-text">{row.text || " "}</span>
+                      </div>
+                    ))}
+                  </pre>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {planFiles.files.length > 0 && (
+        <section>
+          <h2>Choose commit branch</h2>
+          <p className="muted">Which branch should we commit these changes to?</p>
+          <div className="ol-branch-picker">
+            <select
+              value={branchChoice}
+              onChange={(e) => setBranchChoice(e.target.value)}
+              disabled={rerunBusy}
+            >
+              {planFiles.defaultBranch && (
+                <option value={planFiles.defaultBranch}>
+                  suggested: {planFiles.defaultBranch}
+                </option>
+              )}
+              <option value="main">main</option>
+              <option value="__custom__">custom…</option>
+            </select>
+            {branchChoice === "__custom__" && (
+              <input
+                type="text"
+                placeholder="feature/my-branch"
+                value={customBranch}
+                onChange={(e) => setCustomBranch(e.target.value)}
+                disabled={rerunBusy}
+              />
+            )}
+            <button className="btn btn-primary" onClick={rerunWithBranch} disabled={rerunBusy}>
+              {rerunBusy ? "Starting..." : "Run on selected branch"}
+            </button>
+          </div>
+          {rerunMsg && <p className="muted">{rerunMsg}</p>}
+        </section>
+      )}
+
       <section>
         <h2>Timeline</h2>
         <ol className="timeline">
@@ -211,6 +336,48 @@ export function OLRunDetail({
       )}
     </div>
   );
+}
+
+type PlanFile = { path: string; operation: string; content: string };
+
+function readPlanFiles(lane: LaneResultDto): {
+  defaultBranch: string;
+  files: PlanFile[];
+} {
+  const extra = (lane.extra || {}) as Record<string, unknown>;
+  const plan = (extra.plan || {}) as Record<string, unknown>;
+  const defaultBranch = String(plan.branch_name || "");
+  const rawFiles = Array.isArray(plan.file_changes) ? plan.file_changes : [];
+  const files: PlanFile[] = [];
+  for (const item of rawFiles) {
+    const obj = (item || {}) as Record<string, unknown>;
+    const path = String(obj.path || "");
+    if (!path) continue;
+    files.push({
+      path,
+      operation: String(obj.operation || "update"),
+      content: String(obj.content || ""),
+    });
+  }
+  return { defaultBranch, files };
+}
+
+type DiffRow = { kind: "add" | "del" | "ctx"; prefix: "+" | "-" | " "; text: string };
+
+function buildDiffRows(oldText: string, newText: string): DiffRow[] {
+  const oldLines = oldText ? oldText.split("\n") : [];
+  const newLines = newText ? newText.split("\n") : [];
+  if (oldLines.length === 0) {
+    return newLines.map((line) => ({ kind: "add", prefix: "+", text: line }));
+  }
+  const rows: DiffRow[] = [];
+  for (const line of oldLines) {
+    rows.push({ kind: "del", prefix: "-", text: line });
+  }
+  for (const line of newLines) {
+    rows.push({ kind: "add", prefix: "+", text: line });
+  }
+  return rows;
 }
 
 function Header({ run }: { run: OrchestratorRunRecord }) {

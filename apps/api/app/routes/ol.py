@@ -16,6 +16,7 @@ from app.schemas.api import (
     OrchestratorRunOut,
     RetrievedChunkOut,
 )
+from app.services.local_user_data_store import get_orchestrator_run_snapshot
 
 router = APIRouter(prefix="/orchestrator", tags=["orchestrator"])
 
@@ -24,7 +25,13 @@ router = APIRouter(prefix="/orchestrator", tags=["orchestrator"])
 def get_orchestrator_run(run_id: str, db: Session = Depends(get_db)) -> OLRunDetailOut:
     run = db.get(OrchestratorRun, run_id)
     if not run:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="run_not_found")
+        snap = get_orchestrator_run_snapshot(run_id)
+        if not snap:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="run_not_found")
+        return OLRunDetailOut(
+            run=OrchestratorRunOut.model_validate(snap),
+            retrieved_chunks=[],
+        )
 
     chunks: list[RetrievedChunkOut] = []
     for chunk_id in run.retrieved_chunk_ids or []:
