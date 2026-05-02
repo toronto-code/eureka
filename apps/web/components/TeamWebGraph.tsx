@@ -64,15 +64,35 @@ const STYLE: any[] = [
 export function TeamWebGraph({ profiles, activity, currentUserId, web }: Props) {
   const ref = useRef<HTMLDivElement | null>(null);
   const cyRef = useRef<Core | null>(null);
-  const hasData = profiles.length > 0;
+
+  // Restrict the web to ONLY users + tools + services that have appeared in
+  // the (already-windowed) activity. When the activity expires, so does the web.
+  const profileIds = new Set(profiles.map((p) => p.id));
+  const activeUsers = new Set<string>();
+  const activeTools = new Map<string, Map<string, number>>(); // user_id -> tool -> count
+  for (const a of activity) {
+    if (!a.user_id || !profileIds.has(a.user_id)) continue;
+    activeUsers.add(a.user_id);
+    const inner = activeTools.get(a.user_id) || new Map<string, number>();
+    inner.set(a.label, (inner.get(a.label) || 0) + 1);
+    activeTools.set(a.user_id, inner);
+  }
+  const hasActivity = activeUsers.size > 0;
 
   useEffect(() => {
     if (!ref.current) return;
-    if (!hasData) return;
+    if (!hasActivity) {
+      // No recent activity → wipe the graph entirely
+      cyRef.current?.destroy();
+      cyRef.current = null;
+      return;
+    }
     const nodes: cytoscape.NodeDefinition[] = [];
     const edges: cytoscape.EdgeDefinition[] = [];
 
+    // Users: only those who have recent activity
     for (const p of profiles) {
+      if (!activeUsers.has(p.id)) continue;
       nodes.push({
         data: {
           id: `u:${p.id}`,
@@ -82,46 +102,59 @@ export function TeamWebGraph({ profiles, activity, currentUserId, web }: Props) 
       });
     }
 
-    const services = ["GitHub", "Slack", "Jira"];
-    for (const s of services) {
+    // Service hubs — only show if any active user has tools touching them
+    const allTools = Array.from(activeTools.values()).flatMap((m) => Array.from(m.keys()));
+    const usesGitHub = allTools.some((t) => /repo|branch|commit|pr|read_file|list_repo|workflow|github/i.test(t));
+    const usesSlack = allTools.some((t) => /slack|channel|invite|topic/i.test(t));
+    const usesJira = allTools.some((t) => /jira|comment_jira|transition|assign_jira/i.test(t));
+
+    const activeServices: string[] = [];
+    if (usesGitHub) activeServices.push("GitHub");
+    if (usesSlack) activeServices.push("Slack");
+    if (usesJira) activeServices.push("Jira");
+
+    for (const s of activeServices) {
       nodes.push({ data: { id: `s:${s}`, label: s, type: "service" } });
-      for (const p of profiles) {
-        edges.push({ data: { id: `u:${p.id}->s:${s}`, source: `u:${p.id}`, target: `s:${s}`, weight: 2 } });
+      for (const uid of activeUsers) {
+        edges.push({ data: { id: `u:${uid}->s:${s}`, source: `u:${uid}`, target: `s:${s}`, weight: 2 } });
       }
     }
 
-    for (const r of web?.repos || []) {
-      const id = `r:${r.owner}/${r.name}`;
-      nodes.push({ data: { id, label: r.name, type: "repo" } });
-      edges.push({ data: { id: `s:GitHub->${id}`, source: "s:GitHub", target: id, weight: 1 } });
+    // Repos / jira tickets / channels — only if their service is active
+    if (usesGitHub) {
+      for (const r of web?.repos || []) {
+        const id = `r:${r.owner}/${r.name}`;
+        nodes.push({ data: { id, label: r.name, type: "repo" } });
+        edges.push({ data: { id: `s:GitHub->${id}`, source: "s:GitHub", target: id, weight: 1 } });
+      }
     }
-    for (const j of web?.jira || []) {
-      const id = `j:${j.key}`;
-      nodes.push({ data: { id, label: j.key, type: "jira" } });
-      edges.push({ data: { id: `s:Jira->${id}`, source: "s:Jira", target: id, weight: 1 } });
+    if (usesJira) {
+      for (const j of web?.jira || []) {
+        const id = `j:${j.key}`;
+        nodes.push({ data: { id, label: j.key, type: "jira" } });
+        edges.push({ data: { id: `s:Jira->${id}`, source: "s:Jira", target: id, weight: 1 } });
+      }
     }
-    for (const c of web?.channels || []) {
-      const id = `c:${c}`;
-      nodes.push({ data: { id, label: `#${c}`, type: "channel" } });
-      edges.push({ data: { id: `s:Slack->${id}`, source: "s:Slack", target: id, weight: 1 } });
+    if (usesSlack) {
+      for (const c of web?.channels || []) {
+        const id = `c:${c}`;
+        nodes.push({ data: { id, label: `#${c}`, type: "channel" } });
+        edges.push({ data: { id: `s:Slack->${id}`, source: "s:Slack", target: id, weight: 1 } });
+      }
     }
 
-    const userToolCounts = new Map<string, Map<string, number>>();
-    for (const a of activity) {
-      if (!a.user_id) continue;
-      const inner = userToolCounts.get(a.user_id) || new Map<string, number>();
-      inner.set(a.label, (inner.get(a.label) || 0) + 1);
-      userToolCounts.set(a.user_id, inner);
-    }
+    // Tools (only ones from recent activity), connected to the user who used them
     const toolSeen = new Set<string>();
-    for (const [uid, tools] of userToolCounts) {
+    for (const [uid, tools] of activeTools) {
       for (const [tool, count] of tools) {
         const tid = `t:${tool}`;
         if (!toolSeen.has(tid)) {
           toolSeen.add(tid);
           nodes.push({ data: { id: tid, label: tool, type: "tool" } });
         }
-        edges.push({ data: { id: `${uid}-${tool}`, source: `u:${uid}`, target: tid, weight: Math.min(2 + count, 6) } });
+        edges.push({
+          data: { id: `${uid}-${tool}`, source: `u:${uid}`, target: tid, weight: Math.min(2 + count, 6) },
+        });
       }
     }
 
@@ -134,7 +167,7 @@ export function TeamWebGraph({ profiles, activity, currentUserId, web }: Props) 
       wheelSensitivity: 0.2,
     });
     return () => cyRef.current?.destroy();
-  }, [profiles, activity, currentUserId, web, hasData]);
+  }, [profiles, activity, currentUserId, web, hasActivity]);
 
   return (
     <div style={{ position: "relative" }}>
@@ -148,20 +181,27 @@ export function TeamWebGraph({ profiles, activity, currentUserId, web }: Props) 
           overflow: "hidden",
         }}
       />
-      {!hasData && (
+      {!hasActivity && (
         <div
           style={{
             position: "absolute",
             inset: 0,
             display: "flex",
+            flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
             color: "var(--text-muted)",
             fontSize: 13,
             pointerEvents: "none",
+            textAlign: "center",
+            padding: 24,
           }}
         >
-          Loading network…
+          <div style={{ fontWeight: 600, color: "var(--text)" }}>No recent activity</div>
+          <div style={{ marginTop: 4 }}>
+            The team web rebuilds itself when someone uses the orchestrator.
+            Activity older than 20 minutes rolls off automatically.
+          </div>
         </div>
       )}
       <div style={{ position: "absolute", bottom: 8, right: 12, fontSize: 10, color: "var(--text-muted)", display: "flex", flexWrap: "wrap", gap: 10 }}>
