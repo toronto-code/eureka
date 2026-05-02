@@ -346,15 +346,14 @@ async def run_task_worker(
                 except Exception:
                     logger.exception("memory write failed for task %s", task_id)
 
-            executor.clear_history()
-            executor.clear_auto_approve()
-            executor.set_user_id(None)
-
         except Exception as exc:
             logger.exception("Task failed: %s", task_id)
             await _publish_result(bus, payload, AgentTaskStatus.FAILED, None, str(exc))
 
         finally:
+            executor.clear_history()
+            executor.clear_auto_approve()
+            executor.set_user_id(None)
             await bus.ack(Topic.AGENTS_TASKS, "agent-runtime", message_id)
 
     await bus.consume(

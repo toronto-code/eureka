@@ -43,10 +43,13 @@ class SkillModel(BaseModel):
 
         if signal.is_positive:
             entry["success"] += signal.weight
+            entry["total"] += signal.weight
         elif signal.is_negative:
             entry["failure"] += signal.weight
+            entry["total"] += signal.weight
+        # Neutral signals (e.g. status=running) are intentionally skipped —
+        # they carry no success/failure information and would dilute the score.
 
-        entry["total"] += signal.weight
         if entry["total"] > 0:
             entry["score"] = entry["success"] / entry["total"]
 

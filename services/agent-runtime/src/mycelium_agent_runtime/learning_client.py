@@ -103,7 +103,7 @@ class LearningClient:
             return False
         try:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
-                r = await client.get(f"{self._base_url}/healthz")
+                r = await client.get(f"{self._base_url}/health")
                 return r.status_code == 200
         except Exception:
             return False

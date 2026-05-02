@@ -126,6 +126,24 @@ async def run_approvals_consumer() -> None:
             if not approved_action_ids and payload.get("approved_action_ids"):
                 approved_action_ids = payload["approved_action_ids"]
 
+            if not approved_action_ids:
+                logger.warning(
+                    "Approval for task %s has no action IDs to auto-approve; "
+                    "failing task to avoid an approval retry loop",
+                    task_id,
+                )
+                await _publish_task_failed(
+                    bus,
+                    task_id=task_id,
+                    agent_id=agent_id,
+                    correlation_id=correlation_id,
+                    reason=(
+                        "approval decision arrived without pending_actions or "
+                        "approved_action_ids; cannot resume task safely"
+                    ),
+                )
+                return
+
             await _republish_task(
                 bus,
                 task_id=task_id,
