@@ -45,3 +45,11 @@ coverage.xml
 coverage/
 htmlcov/
 *.pem
+
+# Mycelium agent local artifacts
+.claude/
+observer.log
+mycelium/node_modules/
+mycelium/.next/
+mycelium/data/
+data/

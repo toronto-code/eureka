@@ -45,6 +45,25 @@ x-env: &default-env
   EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE:-50}
   EMBEDDING_TYPE_DENYLIST: ${EMBEDDING_TYPE_DENYLIST:-health,heartbeat,integration_sync.}
   OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  # Mycelium intelligence chat secrets (read by chat_intel router)
+  GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+  GITHUB_USERNAME: ${GITHUB_USERNAME:-}
+  SLACK_TOKEN: ${SLACK_TOKEN:-}
+  JIRA_TOKEN: ${JIRA_TOKEN:-}
+  JIRA_EMAIL: ${JIRA_EMAIL:-}
+  JIRA_DOMAIN: ${JIRA_DOMAIN:-}
+  MYCELIUM_AGENT_WRITES_ENABLED: ${MYCELIUM_AGENT_WRITES_ENABLED:-true}
+  # Security guardrails for the agent. Comma-separated lists.
+  # If any allowlist is empty, that category is unrestricted.
+  MYCELIUM_REPO_ALLOWLIST: ${MYCELIUM_REPO_ALLOWLIST:-}
+  MYCELIUM_REPO_DENYLIST: ${MYCELIUM_REPO_DENYLIST:-}
+  MYCELIUM_SLACK_CHANNEL_ALLOWLIST: ${MYCELIUM_SLACK_CHANNEL_ALLOWLIST:-}
+  MYCELIUM_JIRA_PROJECT_ALLOWLIST: ${MYCELIUM_JIRA_PROJECT_ALLOWLIST:-}
+  MYCELIUM_MAX_WRITES_PER_MIN: ${MYCELIUM_MAX_WRITES_PER_MIN:-20}
+  # Supabase (replaces local Postgres for app-level data)
+  SUPABASE_URL: ${SUPABASE_URL:-}
+  SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:-}
+  SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY:-}
   # Agent memory tuning.
   MEMORY_BUFFER_SIZE: ${MEMORY_BUFFER_SIZE:-20}
   MEMORY_TTL_SECONDS: ${MEMORY_TTL_SECONDS:-3600}
@@ -106,6 +125,8 @@ services:
     environment:
       <<: *default-env
     ports: ["8000:8000"]
+    volumes:
+      - //var/run/docker.sock:/var/run/docker.sock
     depends_on:
       postgres: { condition: service_healthy }
       redis:    { condition: service_healthy }
@@ -122,6 +143,8 @@ services:
       dockerfile: apps/frontend/Dockerfile
     environment:
       VITE_API_URL: http://localhost:8000
+      VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-${SUPABASE_URL:-}}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY:-${SUPABASE_PUBLISHABLE_KEY:-}}
     ports: ["5173:5173"]
     depends_on:
       - api

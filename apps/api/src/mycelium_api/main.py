@@ -15,8 +15,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from mycelium_api.config import announce_dev_mode
 from mycelium_api.routers import (
+    agent_chat,
     agents,
     chat,
+    chat_intel,
+    dashboard_web,
+    docker_obs,
     graph,
     health,
     integrations,
@@ -37,6 +41,7 @@ async def lifespan(_app: FastAPI):
     tasks = [
         asyncio.create_task(run_events_ingestor(), name="events-ingestor"),
         asyncio.create_task(run_agent_results_consumer(), name="agent-results"),
+        asyncio.create_task(docker_obs._docker_event_loop(), name="docker-events"),
     ]
     try:
         yield
@@ -63,3 +68,7 @@ app.include_router(agents.router)
 app.include_router(integrations.router)
 app.include_router(workflows.router)
 app.include_router(observability.router)
+app.include_router(chat_intel.router)
+app.include_router(docker_obs.router)
+app.include_router(agent_chat.router)
+app.include_router(dashboard_web.router)
