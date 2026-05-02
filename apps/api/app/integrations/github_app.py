@@ -20,9 +20,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from functools import lru_cache
-
-from app.config import get_settings
+from app.integrations.github_token import resolve_github_token
 
 
 @dataclass
@@ -52,9 +50,8 @@ class GitHubAuthProvider(ABC):
 class PatAuthProvider(GitHubAuthProvider):
     """Personal Access Token / fine-grained PAT provider.
 
-    One token, used for every repo. Good enough for a single-tenant setup
-    or a bot account. Swap in `GitHubAppAuthProvider` when you need
-    per-install tokens with short TTLs.
+    Token comes from ``GITHUB_TOKEN`` or Fernet-decrypted Postgres storage.
+    Swap in `GitHubAppAuthProvider` when you need per-install tokens with short TTLs.
     """
 
     def __init__(self, token: str | None) -> None:
@@ -63,7 +60,8 @@ class PatAuthProvider(GitHubAuthProvider):
     def token_for(self, repo: RepoRef) -> str:
         if not self._token:
             raise RuntimeError(
-                "GitHub token not configured. Set GITHUB_TOKEN in .env."
+                "GitHub token not configured. Set GITHUB_TOKEN or save an encrypted PAT "
+                "under Settings (requires MYCELIUM_CREDENTIALS_KEY)."
             )
         return self._token
 
@@ -108,15 +106,13 @@ class GitHubAppAuthProvider(GitHubAuthProvider):
         return "github_app"
 
 
-@lru_cache(maxsize=1)
 def get_github_auth_provider() -> GitHubAuthProvider:
     """Pick the right provider based on current settings.
 
     Preference order:
     1. GitHubAppAuthProvider — if app id + private key are present.
-    2. PatAuthProvider — the existing PAT-based path.
+    2. PatAuthProvider — env PAT or Fernet-decrypted PAT from Postgres.
     """
-    settings = get_settings()
     # Placeholder values — we intentionally don't introduce new config fields
     # until the App flow is actually wired.
-    return PatAuthProvider(token=settings.github_token)
+    return PatAuthProvider(token=resolve_github_token())

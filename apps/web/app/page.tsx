@@ -8,6 +8,70 @@ import { api } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
+/** Inline icons keep the dashboard light (no extra deps) and let us tint via currentColor. */
+function InboxIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M22 12h-6l-2 3h-4l-2-3H2" />
+      <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11Z" />
+    </svg>
+  );
+}
+
+function CheckCircleIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+      <polyline points="22 4 12 14.01 9 11.01" />
+    </svg>
+  );
+}
+
+function integrationStatus(integrations: Awaited<ReturnType<typeof api.integrations>>) {
+  return [
+    {
+      label: "OpenAI",
+      value: integrations.openai ? "configured" : "not configured",
+      tone: integrations.openai ? "configured" : "down",
+    },
+    {
+      label: "Jira",
+      value: integrations.jira ? "configured" : "fake-seed mode",
+      tone: integrations.jira ? "configured" : "fake-seed",
+    },
+    {
+      label: "GitHub",
+      value: integrations.github
+        ? integrations.github_real_mode
+          ? "configured · live writes"
+          : "configured · dry-run"
+        : "fake-seed mode",
+      tone: integrations.github ? "configured" : "fake-seed",
+    },
+    {
+      label: "Database",
+      value: integrations.database ? "ok" : "down",
+      tone: integrations.database ? "configured" : "down",
+    },
+  ] as const;
+}
+
 export default async function DashboardPage() {
   const [tasks, runs, integrations] = await Promise.all([
     api.listTasks(),
@@ -27,6 +91,8 @@ export default async function DashboardPage() {
       )
     : [];
 
+  const integrationRows = integrationStatus(integrations);
+
   return (
     <div>
       <header className="page-header">
@@ -43,34 +109,38 @@ export default async function DashboardPage() {
       <div className="grid-3">
         <div className="card">
           <h3>Tasks</h3>
-          <div style={{ fontSize: 28, fontWeight: 600 }}>{tasks.length}</div>
-          <div className="muted">{pendingApprovals.length} awaiting approval</div>
-          <Link href="/tasks" className="btn" style={{ marginTop: 12 }}>
+          <div className="stat-number">{tasks.length}</div>
+          <div className="stat-meta">
+            {pendingApprovals.length} awaiting approval
+          </div>
+          <Link href="/tasks" className="btn" style={{ marginTop: 16 }}>
             View tasks
           </Link>
         </div>
         <div className="card">
           <h3>Recent agent runs</h3>
-          <div style={{ fontSize: 28, fontWeight: 600 }}>{runs.length}</div>
-          <div className="muted">{orchestratorRuns.length} orchestrator runs</div>
-          <Link href="/orchestration" className="btn" style={{ marginTop: 12 }}>
+          <div className="stat-number">{runs.length}</div>
+          <div className="stat-meta">
+            {orchestratorRuns.length} orchestrator runs
+          </div>
+          <Link
+            href="/orchestration"
+            className="btn"
+            style={{ marginTop: 16 }}
+          >
             Open orchestration
           </Link>
         </div>
         <div className="card">
           <h3>Integrations</h3>
-          <ul style={{ paddingLeft: 18, margin: 0 }}>
-            <li>OpenAI: {integrations.openai ? "configured" : "not configured"}</li>
-            <li>Jira: {integrations.jira ? "configured" : "fake-seed mode"}</li>
-            <li>
-              GitHub:{" "}
-              {integrations.github
-                ? integrations.github_real_mode
-                  ? "configured · live writes"
-                  : "configured · dry-run"
-                : "fake-seed mode"}
-            </li>
-            <li>DB: {integrations.database ? "ok" : "down"}</li>
+          <ul className="integrations-list">
+            {integrationRows.map((row) => (
+              <li key={row.label}>
+                <span className={`dot-indicator ${row.tone}`} />
+                <span className="label">{row.label}</span>
+                <span className="value">{row.value}</span>
+              </li>
+            ))}
           </ul>
         </div>
       </div>
@@ -80,9 +150,9 @@ export default async function DashboardPage() {
         {integrations.bot_jira_user ? (
           <p className="muted" style={{ marginTop: 0 }}>
             Mycelium auto-executes tasks assigned to{" "}
-            <code>{integrations.bot_jira_user}</code>. {botAssignedTasks.length}{" "}
-            bot-assigned task{botAssignedTasks.length === 1 ? "" : "s"} in Jira.{" "}
-            Auto-execute is{" "}
+            <span className="code-pill">{integrations.bot_jira_user}</span>.{" "}
+            {botAssignedTasks.length} bot-assigned task
+            {botAssignedTasks.length === 1 ? "" : "s"} in Jira. Auto-execute is{" "}
             <strong>
               {integrations.auto_execute_enabled ? "enabled" : "disabled"}
             </strong>
@@ -90,13 +160,16 @@ export default async function DashboardPage() {
           </p>
         ) : (
           <p className="muted" style={{ marginTop: 0 }}>
-            Set <code>MYCELIUM_BOT_JIRA_USER</code> in <code>.env</code> to let
-            Mycelium autonomously execute Jira tasks assigned to it.
+            Set <span className="code-pill">MYCELIUM_BOT_JIRA_USER</span> in{" "}
+            <span className="code-pill">.env</span> to let Mycelium autonomously
+            execute Jira tasks assigned to it.
           </p>
         )}
-        <WatcherButton />
+        <div style={{ marginTop: 14 }}>
+          <WatcherButton />
+        </div>
         {botAssignedTasks.length > 0 ? (
-          <div className="list-card" style={{ marginTop: 12 }}>
+          <div className="list-card" style={{ marginTop: 14 }}>
             {botAssignedTasks.map((t) => (
               <div className="row" key={t.id}>
                 <div className="flex-col" style={{ gap: 4 }}>
@@ -122,22 +195,30 @@ export default async function DashboardPage() {
 
       <div className="card" style={{ marginTop: 24 }}>
         <h3>Recent agent runs</h3>
-        <div className="list-card">
-          {runs.length === 0 ? (
-            <p className="muted">
-              No agent runs yet. Click <strong>Run demo orchestration</strong> to
-              generate one.
+        {runs.length === 0 ? (
+          <div className="empty-state">
+            <InboxIcon />
+            <p>
+              No agent runs yet. Click <strong>Run demo orchestration</strong>{" "}
+              to generate one.
             </p>
-          ) : (
-            runs.map((r) => <AgentRunCard run={r} key={r.id} />)
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="list-card">
+            {runs.map((r) => (
+              <AgentRunCard run={r} key={r.id} />
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="card" style={{ marginTop: 24 }}>
         <h3>Pending approvals</h3>
         {pendingApprovals.length === 0 ? (
-          <p className="muted">Nothing awaiting human approval right now.</p>
+          <div className="empty-state">
+            <CheckCircleIcon />
+            <p>Nothing awaiting human approval right now.</p>
+          </div>
         ) : (
           <div className="list-card">
             {pendingApprovals.map((task) => (

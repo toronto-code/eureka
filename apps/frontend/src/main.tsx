@@ -5,6 +5,7 @@ import { App } from "./App";
 import { Dashboard } from "./views/Dashboard";
 import { Chat } from "./views/Chat";
 import { Observability } from "./views/Observability";
+import { AgentsActivity } from "./views/AgentsActivity";
 import { Login } from "./views/Login";
 import { AuthProvider, useAuth } from "./lib/auth";
 import "./styles.css";
@@ -26,6 +27,7 @@ root.render(
           <Route element={<Protected><App /></Protected>}>
             <Route index element={<Dashboard />} />
             <Route path="chat" element={<Chat />} />
+            <Route path="agents" element={<AgentsActivity />} />
             <Route path="observability" element={<Observability />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

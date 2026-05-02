@@ -1,3 +1,5 @@
+import { GitHubBotSetup } from "@/components/GitHubBotSetup";
+import { GitHubPatStorage } from "@/components/GitHubPatStorage";
 import { api } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
@@ -19,8 +21,8 @@ export default async function SettingsPage() {
         <div>
           <h2>Settings</h2>
           <p>
-            Mycelium reads credentials from <code>.env</code> only. No secrets
-            ever live in the database or the browser.
+            Prefer environment variables for production. Optionally save a GitHub PAT through this UI —
+            it is encrypted at rest (see below). Secrets never appear in API responses or page HTML.
           </p>
         </div>
       </header>
@@ -47,8 +49,8 @@ export default async function SettingsPage() {
           <dd>
             <StatusBadge ok={status.github} />{" "}
             <span className="muted">
-              Set <code>GITHUB_TOKEN</code>, <code>GITHUB_OWNER</code>,{" "}
-              <code>GITHUB_REPO</code> to enable real repo reads.
+              Set <code>GITHUB_OWNER</code> / <code>GITHUB_REPO</code> (and optionally{" "}
+              <code>GITHUB_TOKEN</code> or save an encrypted PAT below).
             </span>
           </dd>
           <dt>Database</dt>
@@ -64,6 +66,14 @@ export default async function SettingsPage() {
           </dd>
         </dl>
       </div>
+
+      <GitHubPatStorage
+        storageEnabled={status.github_pat_storage_enabled}
+        savedInDatabase={status.github_pat_saved_in_database}
+        secretHint={status.github_pat_hint}
+      />
+
+      <GitHubBotSetup githubConfigured={status.github} />
 
       <div className="card">
         <h3>Autonomous execution</h3>

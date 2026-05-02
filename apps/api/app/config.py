@@ -52,6 +52,8 @@ class Settings(BaseSettings):
     # ---- GitHub (optional, falls back to seeded fake repo) ----
     github_token: str | None = None
     github_owner: str | None = None
+    # Legacy / docker-compose.legacy env; used when github_owner is unset.
+    github_org: str | None = None
     github_repo: str | None = None
     github_default_base_branch: str = "main"
     # Comma-separated list of glob-style allowed write paths. Empty = allow all
@@ -95,6 +97,15 @@ class Settings(BaseSettings):
     # ---- Demo / seed ----
     enable_demo_seed: bool = True
 
+    # Fernet key (URL-safe base64, 32 bytes) — generate with:
+    #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    # Required to store GitHub PAT from the Settings UI (encrypted at rest in Postgres).
+    # Env: MYCELIUM_CREDENTIALS_KEY
+    mycelium_credentials_key: str | None = None
+    # Optional: require header X-Mycelium-Setup-Token on PAT save/delete when set.
+    # Env: MYCELIUM_SETUP_TOKEN
+    mycelium_setup_token: str | None = None
+
     @property
     def openai_configured(self) -> bool:
         return bool(self.openai_api_key)
@@ -104,8 +115,13 @@ class Settings(BaseSettings):
         return bool(self.jira_base_url and self.jira_email and self.jira_api_token)
 
     @property
+    def effective_github_owner(self) -> str | None:
+        return self.github_owner or self.github_org
+
+    @property
     def github_configured(self) -> bool:
-        return bool(self.github_token and self.github_owner and self.github_repo)
+        """Env PAT + repo coords only (does not reflect encrypted DB PAT)."""
+        return bool(self.github_token and self.effective_github_owner and self.github_repo)
 
     @property
     def bot_auto_execute_enabled(self) -> bool:

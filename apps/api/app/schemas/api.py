@@ -150,6 +150,10 @@ class IntegrationStatusOut(BaseModel):
     auto_execute_enabled: bool = False
     github_real_mode: bool = False
     jira_watcher_enabled: bool = False
+    # Encrypted PAT storage (Postgres); ``GITHUB_TOKEN`` env still overrides when set.
+    github_pat_storage_enabled: bool = False
+    github_pat_saved_in_database: bool = False
+    github_pat_hint: str | None = None
 
 
 class ApprovalDecisionRequest(BaseModel):

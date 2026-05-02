@@ -4,17 +4,22 @@ import { useAuth } from "./lib/auth";
 export function App() {
   const { pathname } = useLocation();
   const { user, signOut } = useAuth();
-  const isChat = pathname.startsWith("/chat");
-  const isObs = pathname.startsWith("/observability");
-  const isDash = !isChat && !isObs;
+  const tab = pathname.startsWith("/chat")
+    ? "chat"
+    : pathname.startsWith("/agents")
+    ? "agents"
+    : pathname.startsWith("/observability")
+    ? "obs"
+    : "dash";
   return (
     <div className="app">
       <aside className="sidebar">
         <h1 className="brand">mycelium</h1>
         <nav>
-          <Link to="/" className={isDash ? "active" : ""}>Dashboard</Link>
-          <Link to="/chat" className={isChat ? "active" : ""}>Chat</Link>
-          <Link to="/observability" className={isObs ? "active" : ""}>Observability</Link>
+          <Link to="/" className={tab === "dash" ? "active" : ""}>Dashboard</Link>
+          <Link to="/chat" className={tab === "chat" ? "active" : ""}>Chat</Link>
+          <Link to="/agents" className={tab === "agents" ? "active" : ""}>Agents</Link>
+          <Link to="/observability" className={tab === "obs" ? "active" : ""}>Observability</Link>
         </nav>
         <footer style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11, color: "#9ca3af", marginTop: "auto" }}>
           <span>{user?.email}</span>

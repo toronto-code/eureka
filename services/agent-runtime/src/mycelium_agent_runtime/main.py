@@ -12,6 +12,7 @@ from fastapi import FastAPI
 
 from mycelium_agent_runtime.approvals import run_approvals_consumer
 from mycelium_agent_runtime.learning_client import LearningClient
+from mycelium_agent_runtime.agents.catalog import list_personas
 from mycelium_agent_runtime.skills import registry
 from mycelium_agent_runtime.worker import (
     run_task_worker,
@@ -88,6 +89,22 @@ async def list_skills() -> list[dict[str, str]]:
     return registry.describe()
 
 
+@app.get("/agents/personas")
+async def list_agent_personas() -> list[dict[str, Any]]:
+    """Logical GPT agents (orchestrator + specialists). Maps to skills + prompts."""
+    return [
+        {
+            "id": p.id,
+            "title": p.title,
+            "description": p.description,
+            "default_skill": p.default_skill,
+            "system_prompt": p.system_prompt,
+            "tags": sorted(p.tags),
+        }
+        for p in list_personas()
+    ]
+
+
 @app.get("/permissions")
 async def list_permissions() -> dict[str, Any]:
     """List all permission rules."""
@@ -112,16 +129,17 @@ async def list_permissions() -> dict[str, Any]:
 
 @app.post("/agents/spawn")
 async def spawn_agent(payload: dict) -> dict[str, Any]:
-    """Stub for Claworc-managed OpenClaw spawn.
+    """Create a logical agent for a user.
 
-    Real impl: ask Claworc to create an OpenClaw instance bound to ``owner_user_id``.
+    Agents are lightweight — one per user, in-process. There's no external
+    sandbox to provision; the agent is really just a persistent identity
+    tied to that user's task/memory/learning history.
     """
     owner_user_id = payload.get("owner_user_id", "unknown")
     return {
         "agent_id": f"agent-{owner_user_id}",
         "owner_user_id": owner_user_id,
         "status": "spawned",
-        "stub": True,
     }
 
 

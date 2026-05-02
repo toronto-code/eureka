@@ -2,8 +2,8 @@
 to ``agents.results``. Knowledge graph queries go via HTTP — never direct DB.
 
 Three layers compose here:
-- Execution backend + action executor with a permission guard (local /
-  OpenClaw). Handles *what* the skill is allowed to do.
+- Execution backend + action executor with a permission guard (LocalBackend).
+  Handles *what* the skill is allowed to do.
 - Learning client (optional). Records signals from successful executions.
 - Memory wiring (short-term + long-term). Handles *what context* the skill
   starts with and what is persisted after success.
@@ -43,7 +43,6 @@ logger = logging.getLogger(__name__)
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
 KNOWLEDGE_URL = os.getenv("KNOWLEDGE_URL", "http://knowledge:8001")
-EXECUTION_BACKEND = os.getenv("EXECUTION_BACKEND", "local")
 WORKING_DIRECTORY = os.getenv("WORKING_DIRECTORY", "/tmp/agent-workspace")
 
 
@@ -52,15 +51,8 @@ def _bus() -> EventBus:
 
 
 def _create_backend() -> "ExecutionBackend":
-    """Create the execution backend based on environment config."""
+    """Create the local execution backend."""
     from mycelium_agent_runtime.execution.local import LocalBackend
-
-    if EXECUTION_BACKEND == "openclaw":
-        from mycelium_agent_runtime.execution.openclaw import OpenClawBackend
-
-        api_key = os.getenv("OPENCLAW_API_KEY", "")
-        api_url = os.getenv("OPENCLAW_API_URL", "https://api.openclaw.ai")
-        return OpenClawBackend(api_key=api_key, api_url=api_url)
 
     return LocalBackend(working_directory=WORKING_DIRECTORY)
 
@@ -346,15 +338,14 @@ async def run_task_worker(
                 except Exception:
                     logger.exception("memory write failed for task %s", task_id)
 
-            executor.clear_history()
-            executor.clear_auto_approve()
-            executor.set_user_id(None)
-
         except Exception as exc:
             logger.exception("Task failed: %s", task_id)
             await _publish_result(bus, payload, AgentTaskStatus.FAILED, None, str(exc))
 
         finally:
+            executor.clear_history()
+            executor.clear_auto_approve()
+            executor.set_user_id(None)
             await bus.ack(Topic.AGENTS_TASKS, "agent-runtime", message_id)
 
     await bus.consume(

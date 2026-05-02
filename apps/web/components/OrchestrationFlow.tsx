@@ -21,7 +21,7 @@ export function OrchestrationFlow({
   const [selected, setSelected] = useState<AgentRun | null>(null);
 
   return (
-    <div className="card">
+    <div className="card" id="agent-flow">
       <h3>Agent flow</h3>
       <div className="flow-graph">
         <div
