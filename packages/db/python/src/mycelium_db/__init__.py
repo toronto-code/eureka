@@ -10,15 +10,28 @@ Two clients live here:
 """
 
 from mycelium_db.postgres import PostgresClient, get_postgres_engine, get_session
-from mycelium_db.models import Base, EventRow, IntegrationSyncRow, AgentRow, AgentTaskRow, AuditRow
+from mycelium_db.models import (
+    AgentMemoryRow,
+    AgentRow,
+    AgentTaskRow,
+    AuditRow,
+    Base,
+    DocumentEmbeddingRow,
+    EventRow,
+    IntegrationSyncRow,
+    LearningSignalRow,
+)
 
 __all__ = [
+    "AgentMemoryRow",
     "AgentRow",
     "AgentTaskRow",
     "AuditRow",
     "Base",
+    "DocumentEmbeddingRow",
     "EventRow",
     "IntegrationSyncRow",
+    "LearningSignalRow",
     "PostgresClient",
     "get_postgres_engine",
     "get_session",

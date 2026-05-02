@@ -4,7 +4,7 @@ WORKDIR /workspace
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PYTHONPATH=/workspace/services/agent-runtime/src:/workspace/packages/shared-types/python/src:/workspace/packages/event-bus/python/src:/workspace/packages/db/python/src
+    PYTHONPATH=/workspace/services/agent-runtime/src:/workspace/packages/shared-types/python/src:/workspace/packages/event-bus/python/src:/workspace/packages/db/python/src:/workspace/packages/embeddings/python/src
 
 COPY packages /workspace/packages
 COPY services/agent-runtime /workspace/services/agent-runtime

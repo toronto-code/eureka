@@ -7,15 +7,23 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from sqlalchemy import select
 
+from mycelium_db import EventRow, get_session
 from mycelium_process_intel.discovery import discover_once
 from mycelium_shared_types.health import HealthCheck, ok
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("mycelium-process-intel")
 
-_LATEST: dict = {"process_maps": [], "bottlenecks": [], "deviations": []}
+_LATEST: dict = {
+    "algorithm": None,
+    "petri_net": {"nodes": [], "edges": []},
+    "bottlenecks": [],
+    "deviations": [],
+    "case_count": 0,
+}
 
 
 async def _discovery_loop() -> None:
@@ -51,9 +59,54 @@ async def health() -> HealthCheck:
 
 @app.post("/discover")
 async def discover_now():
-    return await discover_once()
+    """Force a fresh discovery run and return the result."""
+    result = await discover_once()
+    _LATEST.update(result)
+    return result
 
 
 @app.get("/process-maps")
 async def process_maps():
+    """Return the most recent discovery result (cached)."""
     return _LATEST
+
+
+@app.get("/deviations")
+async def deviations():
+    """Subset of /process-maps: just the conformance deviations.
+
+    Useful for the dashboard's 'where are processes drifting?' panel.
+    """
+    return {
+        "deviations": _LATEST.get("deviations", []),
+        "computed_at": _LATEST.get("computed_at"),
+    }
+
+
+@app.get("/cases/{correlation_id}")
+async def case_trace(correlation_id: str):
+    """Reconstruct the full ordered trace for a single case."""
+    async with get_session() as session:
+        rows = (
+            await session.execute(
+                select(EventRow)
+                .where(EventRow.correlation_id == correlation_id)
+                .order_by(EventRow.timestamp.asc())
+            )
+        ).scalars().all()
+    if not rows:
+        raise HTTPException(status_code=404, detail="no events for that correlation_id")
+    return {
+        "correlation_id": correlation_id,
+        "trace": [
+            {
+                "id": r.id,
+                "type": r.type,
+                "source": r.source,
+                "actor": r.actor,
+                "object": r.object,
+                "timestamp": r.timestamp.isoformat(),
+            }
+            for r in rows
+        ],
+    }

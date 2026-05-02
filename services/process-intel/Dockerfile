@@ -9,8 +9,10 @@ ENV PYTHONUNBUFFERED=1 \
 COPY packages /workspace/packages
 COPY services/process-intel /workspace/services/process-intel
 
-# pm4py pulls in heavy deps (numpy/pandas/graphviz). Keep it optional so the
-# container builds quickly in DEV; the discovery code degrades gracefully.
+# pm4py + pandas are large but required for real discovery. The discovery
+# module degrades gracefully to a directly-follows fallback if either
+# import fails, so this layer can be temporarily commented out for fast
+# iteration on unrelated changes.
 RUN pip install \
     "fastapi>=0.111,<1" \
     "uvicorn[standard]>=0.30,<1" \
@@ -18,7 +20,9 @@ RUN pip install \
     "redis>=5.0,<6" \
     "sqlalchemy>=2.0" \
     "asyncpg>=0.29" \
-    "psycopg[binary]>=3.1"
+    "psycopg[binary]>=3.1" \
+    "pandas>=2.2,<3" \
+    "pm4py>=2.7,<3"
 
 EXPOSE 8004
 

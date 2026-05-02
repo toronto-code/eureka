@@ -1,5 +1,21 @@
 """Consumes ``agents.tasks``, runs the appropriate skill, and publishes
 to ``agents.results``. Knowledge graph queries go via HTTP — never direct DB.
+
+Three layers compose here:
+- Execution backend + action executor with a permission guard (local /
+  OpenClaw). Handles *what* the skill is allowed to do.
+- Learning client (optional). Records signals from successful executions.
+- Memory wiring (short-term + long-term). Handles *what context* the skill
+  starts with and what is persisted after success.
+
+Memory wiring details:
+- Short-term: per-correlation conversation buffer (in-process). Injected into
+  the skill's input as ``recent_turns``; the user prompt and the skill output
+  are appended automatically.
+- Long-term: pgvector-backed ``agent_memories`` table. Top-K memories
+  relevant to the prompt are fetched at task start and injected as
+  ``relevant_memories``. After a successful run we write a summary plus any
+  ``remember_this`` payload from the skill.
 """
 
 from __future__ import annotations
@@ -11,6 +27,8 @@ from typing import Any, TYPE_CHECKING
 
 import httpx
 
+from mycelium_agent_runtime.longterm import read_relevant_memories, write_task_memories
+from mycelium_agent_runtime.memory import MemoryTurn, default_memory, turns_to_context
 from mycelium_agent_runtime.skills import registry
 from mycelium_event_bus import EventBus, Topic
 from mycelium_event_bus.bus import EventBusConfig
@@ -33,7 +51,7 @@ def _bus() -> EventBus:
     return EventBus(EventBusConfig(redis_url=REDIS_URL))
 
 
-def _create_backend() -> ExecutionBackend:
+def _create_backend() -> "ExecutionBackend":
     """Create the execution backend based on environment config."""
     from mycelium_agent_runtime.execution.local import LocalBackend
 
@@ -48,9 +66,9 @@ def _create_backend() -> ExecutionBackend:
 
 
 def _create_executor(
-    backend: ExecutionBackend,
-    learning_client: LearningClient | None = None,
-) -> ActionExecutor:
+    backend: "ExecutionBackend",
+    learning_client: "LearningClient | None" = None,
+) -> "ActionExecutor":
     """Create the action executor with permission guard."""
     from mycelium_agent_runtime.actions.executor import ActionExecutor
     from mycelium_agent_runtime.permissions import PermissionGuard, get_default_rules
@@ -63,7 +81,7 @@ def _create_executor(
     )
 
 
-def _create_learning_client() -> LearningClient | None:
+def _create_learning_client() -> "LearningClient | None":
     """Create the learning client, or None if disabled."""
     from mycelium_agent_runtime.learning_client import LearningClient, LEARNING_ENABLED
 
@@ -83,12 +101,23 @@ async def _query_knowledge(prompt: str) -> dict[str, Any]:
             return {"nodes": [], "edges": []}
 
 
+def _user_id_for(task: dict[str, Any]) -> str | None:
+    return (task.get("input_data", {}) or {}).get("user_id") or task.get("user_id")
+
+
 async def _execute(
     task: dict[str, Any],
-    executor: ActionExecutor,
+    executor: "ActionExecutor",
     context: dict[str, Any],
 ) -> dict[str, Any]:
-    """Execute a task using the skill registry and action executor."""
+    """Execute a task using the skill registry, action executor, and memory.
+
+    The skill receives a single dict containing its original input plus three
+    injected keys: ``knowledge`` (graph context), ``recent_turns`` (short-term
+    memory for this correlation_id), and ``relevant_memories`` (top-K from the
+    long-term store). Skills with an ``execute(input, context, executor)`` impl
+    are dispatched there; otherwise we fall back to ``handler(input)``.
+    """
     skill_name = task.get("agent_type", "summarize")
     skill = registry.get(skill_name)
 
@@ -98,17 +127,66 @@ async def _execute(
     if skill is None:
         return {"error": f"No skill found for: {skill_name}"}
 
-    input_data = {**task.get("input_data", {}), "knowledge": context}
+    correlation_id = task["correlation_id"]
+    input_data = dict(task.get("input_data", {}) or {})
+    prompt = input_data.get("prompt", "")
+    agent_id = task.get("agent_id")
+    user_id = _user_id_for(task)
+
+    short_term = default_memory()
+
+    # -- read paths --------------------------------------------------------
+    recent = await short_term.recent(correlation_id)
+    relevant = await read_relevant_memories(
+        query=prompt or skill_name,
+        agent_id=agent_id,
+        user_id=user_id,
+    )
+
+    # -- record the user turn before invoking the skill --------------------
+    if prompt:
+        await short_term.append(
+            correlation_id,
+            MemoryTurn(
+                role="user", content=prompt, metadata={"task_id": task.get("task_id")}
+            ),
+        )
+
+    # -- run the skill -----------------------------------------------------
+    skill_input = {
+        **input_data,
+        "knowledge": context,
+        "recent_turns": turns_to_context(recent),
+        "relevant_memories": relevant,
+    }
 
     if hasattr(skill, "execute"):
-        result = await skill.execute(input_data, context, executor)
+        result = await skill.execute(skill_input, context, executor)
     else:
-        result = await skill.handler(input_data)
+        result = await skill.handler(skill_input)
 
+    # -- record the agent turn ---------------------------------------------
+    response_text = ""
+    if isinstance(result, dict):
+        response_text = (
+            result.get("summary")
+            or result.get("briefing")
+            or result.get("label")
+            or result.get("response")
+            or ""
+        )
+    await short_term.append(
+        correlation_id,
+        MemoryTurn(
+            role="agent",
+            content=str(response_text),
+            metadata={"skill": skill_name, "task_id": task.get("task_id")},
+        ),
+    )
     return result
 
 
-def _is_pending_approval(result: dict[str, Any] | None, executor: ActionExecutor) -> bool:
+def _is_pending_approval(result: dict[str, Any] | None, executor: "ActionExecutor") -> bool:
     """Detect whether a skill result or execution history indicates pending approval."""
     if isinstance(result, dict) and result.get("pending_approval"):
         return True
@@ -120,7 +198,7 @@ def _is_pending_approval(result: dict[str, Any] | None, executor: ActionExecutor
     return False
 
 
-def _extract_pending_actions(executor: ActionExecutor) -> list[dict[str, Any]]:
+def _extract_pending_actions(executor: "ActionExecutor") -> list[dict[str, Any]]:
     """Extract pending approval actions from executor history."""
     pending: list[dict[str, Any]] = []
     for action, action_result in executor.get_history():
@@ -183,9 +261,9 @@ async def _publish_approval_request(
 
 
 async def run_task_worker(
-    backend: ExecutionBackend | None = None,
-    executor: ActionExecutor | None = None,
-    learning_client: LearningClient | None = None,
+    backend: "ExecutionBackend | None" = None,
+    executor: "ActionExecutor | None" = None,
+    learning_client: "LearningClient | None" = None,
 ) -> None:
     """Run the agent task worker.
 
@@ -261,6 +339,12 @@ async def run_task_worker(
             else:
                 await _publish_result(bus, payload, AgentTaskStatus.SUCCEEDED, result, None)
                 logger.info("Task succeeded: %s", task_id)
+                # Persist long-term memory only on successful (non-paused) runs.
+                # Errors here must not poison task status.
+                try:
+                    await write_task_memories(task=payload, result=result or {})
+                except Exception:
+                    logger.exception("memory write failed for task %s", task_id)
 
             executor.clear_history()
             executor.clear_auto_approve()
