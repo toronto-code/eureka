@@ -7,6 +7,7 @@ import { Chat } from "./views/Chat";
 import { Observability } from "./views/Observability";
 import { AgentsActivity } from "./views/AgentsActivity";
 import { Login } from "./views/Login";
+import { Orchestrator, Tasks, Ingestion, OrchestrationLegacy, Settings } from "./views/StubView";
 import { AuthProvider, useAuth } from "./lib/auth";
 import "./styles.css";
 
@@ -27,8 +28,13 @@ root.render(
           <Route element={<Protected><App /></Protected>}>
             <Route index element={<Dashboard />} />
             <Route path="chat" element={<Chat />} />
+            <Route path="ol" element={<Orchestrator />} />
+            <Route path="tasks" element={<Tasks />} />
+            <Route path="ingestion" element={<Ingestion />} />
+            <Route path="orchestration" element={<OrchestrationLegacy />} />
             <Route path="agents" element={<AgentsActivity />} />
             <Route path="observability" element={<Observability />} />
+            <Route path="settings" element={<Settings />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
