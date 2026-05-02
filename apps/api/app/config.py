@@ -79,6 +79,16 @@ class Settings(BaseSettings):
     #   "status in ('To Do','In Progress') AND updated >= -7d"
     jira_watcher_extra_jql: str | None = None
 
+    # ---- Webhook signing secrets (production path) ----
+    github_webhook_secret: str | None = None
+    # Jira Cloud webhooks aren't HMAC-signed by default. If you front the
+    # webhook with a shared-secret header, put it here.
+    jira_webhook_shared_secret: str | None = None
+
+    # ---- Dev-mode polling sync (used when webhooks can't reach us) ----
+    sync_polling_enabled: bool = False
+    sync_polling_interval_seconds: int = 120
+
     # ---- Frontend / CORS ----
     frontend_origin: str = "http://localhost:3000"
 

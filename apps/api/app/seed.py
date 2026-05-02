@@ -24,7 +24,7 @@ from app.integrations._fakes import (
     fake_repo,
     fake_transcripts,
 )
-from app.models import Task
+from app.models import Project, Task
 from app.schemas.project_data import (
     CodeFileData,
     DocData,
@@ -108,7 +108,9 @@ def build_demo_project_data() -> ProjectData:
 
 
 def seed_database(session: Session) -> None:
-    """Insert demo Task rows if the table is empty."""
+    """Insert demo Task rows + a demo Project/Repository for the OL flow."""
+    _seed_demo_project(session)
+
     has_any = session.execute(select(Task).limit(1)).scalar_one_or_none()
     if has_any is not None:
         return
@@ -130,3 +132,83 @@ def seed_database(session: Session) -> None:
         )
     session.commit()
     logger.info("Seeded %s demo tasks.", len(fake_jira_tasks()))
+
+
+def _seed_demo_project(session: Session) -> None:
+    """Create a canonical Project + Repository + a few indexed chunks."""
+    from app.memory.project_data import ProjectDataService
+
+    project = session.execute(
+        select(Project).where(Project.slug == "demo-payments")
+    ).scalar_one_or_none()
+    if project is not None:
+        return
+
+    pd = ProjectDataService()
+    project = pd.ensure_project(
+        session,
+        slug="demo-payments",
+        name="Demo Payments Platform",
+        description=(
+            "Seeded demo project. Represents a payments service with Jira + "
+            "GitHub sources. Used to exercise the OL orchestrator end-to-end."
+        ),
+        primary_language="python",
+        jira_project_key=DEMO_PROJECT_KEY,
+    )
+    repo_meta = fake_repo()
+    owner, _, repo_name = (repo_meta.get("full_name") or "mycelium-demo/payments-service").partition("/")
+    repository = pd.ensure_repository(
+        session,
+        project_id=project.id,
+        owner=owner or "mycelium-demo",
+        name=repo_name or "payments-service",
+        default_branch=repo_meta.get("default_branch") or "main",
+        html_url=repo_meta.get("html_url"),
+    )
+    # Ingest a handful of seeded code files + docs so retrieval has something
+    # to return without having to call sync endpoints first.
+    for f in repo_meta.get("files", []):
+        if not f.get("content"):
+            continue
+        pd.upsert_repo_file(
+            session,
+            project_id=project.id,
+            repo_id=repository.id,
+            path=f.get("path") or "",
+            content=f.get("content") or "",
+            branch=repository.default_branch,
+        )
+    for doc in fake_docs():
+        pd.chunker  # no-op: keep ChunkingService warm
+        drafts = pd.chunker.chunk_doc(
+            project_id=project.id,
+            source_id=doc.get("id") or doc.get("title", "doc"),
+            title=doc.get("title"),
+            content=doc.get("content") or "",
+        )
+        if not drafts:
+            continue
+        pd._replace_chunks(  # type: ignore[attr-defined]
+            session,
+            project_id=project.id,
+            source_type="doc",
+            source_id=drafts[0].source_id,
+            drafts=drafts,
+        )
+    for issue in fake_jira_tasks():
+        pd.upsert_jira_ticket(
+            session,
+            project_id=project.id,
+            key=issue["key"],
+            title=issue["title"],
+            description=issue.get("description"),
+            status=issue.get("status"),
+            assignee=issue.get("assignee"),
+            assignee_email=issue.get("assignee_email"),
+            labels=issue.get("labels") or [],
+            comments=issue.get("comments") or [],
+            raw_payload=issue,
+        )
+    session.commit()
+    logger.info("Seeded demo project %s", project.slug)

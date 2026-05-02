@@ -20,7 +20,7 @@ from sqlalchemy.exc import OperationalError
 
 from app.config import get_settings
 from app.db import Base, SessionLocal, engine
-from app.routes import agents, ingestion, system, tasks
+from app.routes import agents, ingestion, ol, projects, system, tasks, webhooks
 
 # Ensure all model modules are imported so metadata is populated.
 from app import models  # noqa: F401
@@ -86,6 +86,10 @@ def create_app() -> FastAPI:
     app.include_router(agents.router)
     app.include_router(tasks.router)
     app.include_router(ingestion.router)
+    # New OL / multi-repo surface.
+    app.include_router(projects.router)
+    app.include_router(ol.router)
+    app.include_router(webhooks.router)
     return app
 
 

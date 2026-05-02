@@ -1,16 +1,24 @@
-"""OrchestratorAgent: the wide central GPT-4o agent that coordinates workers.
+"""OrchestratorAgent (DEPRECATED — kept for backwards compatibility).
 
-Flow:
+This is the original "run all 8 workers every time" orchestrator. It is
+being replaced by **OL** (`app.agents.ol.OLClassifier`) + the lane
+dispatcher (`app.agents.lanes.LaneDispatcher`).
+
+Why: OL is route-first and lane-dispatched, so it doesn't run a worker
+unless the route asks for it. That's cheaper, safer, and more auditable.
+
+Callers should migrate to `app.services.ol_service.OLService`. The legacy
+`OrchestrationService` still wires this class up so existing UI pages
+keep working, but **do not extend this file**. New features go through
+OL + lanes.
+
+Flow (legacy):
   1. Receive `project_data` + current_task.
   2. Form task understanding (LLM, with deterministic fallback).
   3. Decide which worker agents to spawn + a focused subset for each.
   4. Run each worker through the AgentRegistry.
   5. Merge findings, classify risk via RiskSafetyAgent, recommend next action.
   6. Persist agent_runs + audit_logs through `OrchestratorService` in routes.
-
-The orchestrator does NOT itself open a database session — that is the
-responsibility of the calling route/service. It returns a fully-typed
-`OrchestratorResult` that the route layer translates into DB writes.
 """
 from __future__ import annotations
 

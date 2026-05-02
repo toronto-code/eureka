@@ -1,6 +1,11 @@
-"""OrchestrationService: persist orchestrator + worker runs and audit log entries.
+"""OrchestrationService (legacy; use `services.ol_service.OLService` for new work).
 
-Routes call this service to:
+Kept so the existing /tasks, /agents/demo and /orchestration UI pages keep
+working. This service wraps the deprecated `OrchestratorAgent` (run-all-8
+workers). New features should go through the OL classifier + lane
+dispatcher.
+
+Responsibilities (unchanged from the legacy flow):
 - run the orchestrator,
 - write `agent_runs` rows for the orchestrator and each spawned worker,
 - write `audit_logs` rows for meaningful decisions,

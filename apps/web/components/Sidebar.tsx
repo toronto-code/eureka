@@ -5,9 +5,10 @@ import { usePathname } from "next/navigation";
 
 const NAV = [
   { href: "/", label: "Dashboard" },
+  { href: "/ol", label: "Orchestrator" },
   { href: "/tasks", label: "Tasks" },
   { href: "/ingestion", label: "Ingestion" },
-  { href: "/orchestration", label: "Orchestration" },
+  { href: "/orchestration", label: "Orchestration (legacy)" },
   { href: "/agents", label: "Agents" },
   { href: "/settings", label: "Settings" },
 ];

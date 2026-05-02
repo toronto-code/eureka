@@ -264,3 +264,168 @@ export interface ApprovalDecisionPayload {
   approver?: string;
   notes?: string;
 }
+
+
+// ---------------------------------------------------------------------------
+// OL (new orchestrator) types
+// ---------------------------------------------------------------------------
+
+export type OLRoute =
+  | "inquiry"
+  | "simple_code"
+  | "complex_code"
+  | "planning"
+  | "blocked"
+  | "needs_human_review";
+
+export type OLRiskLevel = "low" | "medium" | "high";
+export type OLOrigin =
+  | "manual"
+  | "jira_webhook"
+  | "jira_polling"
+  | "github_webhook"
+  | "github_polling"
+  | "api";
+
+export interface ProjectSummary {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  primary_language: string | null;
+  jira_project_key: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RetrievalPlanDto {
+  queries: string[];
+  source_types: string[];
+  file_paths: string[];
+  repo_ids: string[];
+  jira_ticket_ids: string[];
+  max_chunks: number;
+  recency_bias: boolean;
+}
+
+export interface WorkerDirectiveDto {
+  worker: string;
+  purpose: string;
+  input_requirements: {
+    needs_retrieved_chunks: boolean;
+    source_types: string[];
+    file_paths: string[];
+    repo_ids: string[];
+    jira_ticket_ids: string[];
+  };
+  expected_output_schema: string;
+  priority: "low" | "medium" | "high";
+}
+
+export interface LaneStep {
+  at: string;
+  label: string;
+  detail: string | null;
+  ok: boolean;
+}
+
+export interface LaneResultDto {
+  lane: string;
+  status: "pending" | "running" | "completed" | "blocked" | "error";
+  summary: string;
+  details: string | null;
+  pr_url: string | null;
+  jira_comment_url: string | null;
+  blocked_reason: string | null;
+  citations: Array<Record<string, unknown>>;
+  steps: LaneStep[];
+  extra: Record<string, unknown>;
+}
+
+export interface OrchestratorRunRecord {
+  id: string;
+  project_id: string;
+  origin: OLOrigin | string;
+  origin_reference: string | null;
+  user_request: string;
+  route: OLRoute | null;
+  confidence: number | null;
+  reasoning_summary: string | null;
+  risk_level: OLRiskLevel | null;
+  retrieval_plan: RetrievalPlanDto | Record<string, unknown>;
+  worker_directives: WorkerDirectiveDto[];
+  retrieved_chunk_ids: string[];
+  lane_used: string | null;
+  lane_status: string | null;
+  lane_result: LaneResultDto | Record<string, unknown>;
+  pr_url: string | null;
+  jira_comment_url: string | null;
+  blocked_reason: string | null;
+  status: string;
+  errors: Array<Record<string, unknown>>;
+  run_metadata: Record<string, unknown>;
+  started_at: string | null;
+  finished_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RetrievedChunkDto {
+  id: string;
+  source_type: string;
+  source_id: string | null;
+  repo_id: string | null;
+  jira_ticket_id: string | null;
+  file_path: string | null;
+  language: string | null;
+  start_line: number | null;
+  end_line: number | null;
+  branch: string | null;
+  commit_sha: string | null;
+  chunk_text: string;
+  score: number;
+  semantic_score: number;
+  keyword_score: number;
+  recency_score: number;
+  chunk_metadata: Record<string, unknown>;
+}
+
+export interface OLRunDetail {
+  run: OrchestratorRunRecord;
+  retrieved_chunks: RetrievedChunkDto[];
+}
+
+export interface OLRunRequest {
+  user_request: string;
+  origin?: OLOrigin;
+  origin_reference?: string | null;
+  jira_ticket_key?: string | null;
+  jira_ticket_id?: string | null;
+  repo_id?: string | null;
+  acceptance_criteria?: string[];
+  extra_hints?: Record<string, unknown>;
+}
+
+export interface OLSearchRequest {
+  text?: string;
+  source_types?: string[];
+  file_paths?: string[];
+  repo_ids?: string[];
+  jira_ticket_ids?: string[];
+  max_chunks?: number;
+  recency_bias?: boolean;
+}
+
+export interface OLSearchResponse {
+  project_id: string;
+  chunks: RetrievedChunkDto[];
+  backend: string;
+}
+
+export interface SyncResultDto {
+  source: string;
+  events_ingested: number;
+  repos_checked: number;
+  skipped: string[];
+  errors: string[];
+}

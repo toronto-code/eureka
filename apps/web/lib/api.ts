@@ -11,9 +11,16 @@ import type {
   DocumentSummary,
   ExecutedAction,
   IntegrationStatus,
+  OLRunDetail,
+  OLRunRequest,
+  OLSearchRequest,
+  OLSearchResponse,
   OrchestratorOutput,
   OrchestratorRunDetail,
+  OrchestratorRunRecord,
   ProjectDataPreview,
+  ProjectSummary,
+  SyncResultDto,
   TaskDetailResponse,
   TaskSummary,
   WatcherRunResult,
@@ -170,6 +177,37 @@ export const api = {
       { method: "POST" },
       { picked_up: 0, ran: 0, skipped: 0, details: [] },
     ),
+
+  // ---- OL orchestrator --------------------------------------------------
+  listProjects: () => request<ProjectSummary[]>("/projects", {}, []),
+  getProject: (projectId: string) =>
+    request<ProjectSummary>(`/projects/${projectId}`),
+  runOrchestrator: (projectId: string, payload: OLRunRequest) =>
+    request<OLRunDetail>(`/projects/${projectId}/orchestrator/run`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  listOrchestratorRuns: (projectId: string, limit = 50) =>
+    request<OrchestratorRunRecord[]>(
+      `/projects/${projectId}/orchestrator/runs?limit=${limit}`,
+      {},
+      [],
+    ),
+  getOrchestratorRun: (runId: string) =>
+    request<OLRunDetail>(`/orchestrator/runs/${runId}`),
+  searchProject: (projectId: string, payload: OLSearchRequest) =>
+    request<OLSearchResponse>(`/projects/${projectId}/search`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  syncGithub: (projectId: string) =>
+    request<SyncResultDto>(`/projects/${projectId}/sync/github`, {
+      method: "POST",
+    }),
+  syncJira: (projectId: string) =>
+    request<SyncResultDto>(`/projects/${projectId}/sync/jira`, {
+      method: "POST",
+    }),
 };
 
 export type { AuditLog, OrchestratorOutput };

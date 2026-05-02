@@ -176,3 +176,122 @@ class WatcherRunOut(BaseModel):
     ran: int
     skipped: int
     details: list[dict[str, Any]]
+
+
+# -----------------------------------------------------------------------------
+# OL (new orchestrator) DTOs
+# -----------------------------------------------------------------------------
+
+
+class ProjectOut(_Base):
+    id: str
+    slug: str
+    name: str
+    description: str | None = None
+    primary_language: str | None = None
+    jira_project_key: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class OrchestratorRunOut(_Base):
+    id: str
+    project_id: str
+    origin: str
+    origin_reference: str | None = None
+    user_request: str
+    route: str | None = None
+    confidence: float | None = None
+    reasoning_summary: str | None = None
+    risk_level: str | None = None
+    retrieval_plan: dict[str, Any] = Field(default_factory=dict)
+    worker_directives: list[dict[str, Any]] = Field(default_factory=list)
+    retrieved_chunk_ids: list[str] = Field(default_factory=list)
+    lane_used: str | None = None
+    lane_status: str | None = None
+    lane_result: dict[str, Any] = Field(default_factory=dict)
+    pr_url: str | None = None
+    jira_comment_url: str | None = None
+    blocked_reason: str | None = None
+    status: str
+    errors: list[dict[str, Any]] = Field(default_factory=list)
+    run_metadata: dict[str, Any] = Field(default_factory=dict)
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class RetrievedChunkOut(BaseModel):
+    id: str
+    source_type: str
+    source_id: str | None = None
+    repo_id: str | None = None
+    jira_ticket_id: str | None = None
+    file_path: str | None = None
+    language: str | None = None
+    start_line: int | None = None
+    end_line: int | None = None
+    branch: str | None = None
+    commit_sha: str | None = None
+    chunk_text: str
+    score: float
+    semantic_score: float
+    keyword_score: float
+    recency_score: float
+    chunk_metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class OLRunDetailOut(BaseModel):
+    run: OrchestratorRunOut
+    retrieved_chunks: list[RetrievedChunkOut] = Field(default_factory=list)
+
+
+class OLRunRequest(BaseModel):
+    user_request: str
+    origin: Literal[
+        "manual",
+        "jira_webhook",
+        "jira_polling",
+        "github_webhook",
+        "github_polling",
+        "api",
+    ] = "manual"
+    origin_reference: str | None = None
+    jira_ticket_key: str | None = None
+    jira_ticket_id: str | None = None
+    repo_id: str | None = None
+    acceptance_criteria: list[str] = Field(default_factory=list)
+    extra_hints: dict[str, Any] = Field(default_factory=dict)
+
+
+class OLSearchRequest(BaseModel):
+    text: str = ""
+    source_types: list[str] = Field(default_factory=list)
+    file_paths: list[str] = Field(default_factory=list)
+    repo_ids: list[str] = Field(default_factory=list)
+    jira_ticket_ids: list[str] = Field(default_factory=list)
+    max_chunks: int = 10
+    recency_bias: bool = True
+
+
+class OLSearchResponse(BaseModel):
+    project_id: str
+    chunks: list[RetrievedChunkOut]
+    backend: str
+
+
+class WebhookAckOut(BaseModel):
+    accepted: bool
+    events_ingested: int
+    skipped: list[str] = Field(default_factory=list)
+    verified: bool
+    reason: str | None = None
+
+
+class SyncResultOut(BaseModel):
+    source: str
+    events_ingested: int
+    repos_checked: int = 0
+    skipped: list[str] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
