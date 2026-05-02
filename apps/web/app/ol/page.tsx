@@ -1,16 +1,21 @@
-import { OLChatThread } from "../../components/OLChatThread";
+import { api } from "../../lib/api";
+import { OLChatInterface } from "../../components/OLChatInterface";
 
 export const dynamic = "force-dynamic";
 
-export default function OLPage() {
+export default async function OLPage() {
+  const projects = await api.listProjects();
+  const defaultProject = projects[0];
+
   return (
-    <main className="page ol-page">
-      <div className="ol-center">
-        <header className="ol-page-header">
-          <h1>Orchestrator</h1>
-        </header>
-        <OLChatThread />
-      </div>
+    <main className="page ol-page" style={{ maxWidth: 1100 }}>
+      <header className="ol-page-header" style={{ marginBottom: 24 }}>
+        <h1>Orchestrator</h1>
+      </header>
+      <OLChatInterface
+        projects={projects}
+        defaultProjectId={defaultProject?.id}
+      />
     </main>
   );
 }

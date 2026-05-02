@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 import { authFetch } from "@/lib/auth";
@@ -12,10 +12,9 @@ const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
   "http://localhost:8000";
 
-interface Props {
-  projects: ProjectSummary[];
-  defaultProjectId?: string;
-}
+const STORAGE_KEY = "ol-sessions-v1";
+
+// ---- Types ----------------------------------------------------------------
 
 interface UserMsg {
   role: "user";
@@ -40,6 +39,14 @@ interface AssistantMsg {
 
 type Msg = UserMsg | AssistantMsg;
 
+interface Session {
+  id: string;
+  title: string;
+  messages: Msg[];
+  createdAt: number;
+  lastOpenedAt: number;
+}
+
 interface AgentAction {
   tool: string;
   args?: Record<string, unknown>;
@@ -48,13 +55,12 @@ interface AgentAction {
   ts?: number;
 }
 
-interface Conversation {
-  id: string;
-  title: string;
-  mode: "agent" | "intel";
-  updated_at: string;
-  message_count?: number;
+interface Props {
+  projects: ProjectSummary[];
+  defaultProjectId?: string;
 }
+
+// ---- Constants ------------------------------------------------------------
 
 const ROUTE_LABELS: Record<string, string> = {
   inquiry: "Inquiry",
@@ -85,19 +91,68 @@ const actionColor = (s?: string) =>
     ? "var(--amber)"
     : "var(--green)";
 
-export function OLChatThread({ projects, defaultProjectId }: Props) {
+function newId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+// ---- localStorage helpers -------------------------------------------------
+
+function readSessions(): Session[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeSessions(sessions: Session[]): void {
+  if (typeof window === "undefined") return;
+  // Sort by lastOpenedAt desc before persisting
+  const sorted = [...sessions].sort((a, b) => b.lastOpenedAt - a.lastOpenedAt);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(sorted));
+}
+
+function upsertSession(session: Session): void {
+  const sessions = readSessions();
+  const idx = sessions.findIndex((s) => s.id === session.id);
+  if (idx >= 0) {
+    sessions[idx] = session;
+  } else {
+    sessions.unshift(session);
+  }
+  writeSessions(sessions);
+}
+
+function deleteSessionById(id: string): void {
+  writeSessions(readSessions().filter((s) => s.id !== id));
+}
+
+// ---- Main component -------------------------------------------------------
+
+export function OLChatInterface({ projects, defaultProjectId }: Props) {
   const projectId = defaultProjectId ?? projects[0]?.id ?? "";
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [activeConvId, setActiveConvId] = useState<string | null>(null);
+
+  const [tab, setTab] = useState<"run" | "history">("run");
+  const [sessionId, setSessionId] = useState<string>(() => newId());
   const [messages, setMessages] = useState<Msg[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [agentMode, setAgentMode] = useState(true);
   const [actions, setActions] = useState<AgentAction[]>([]);
+
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const sseRef = useRef<EventSource | null>(null);
+  // Track sessionId in a ref so the auto-save effect always uses the current value
+  const sessionIdRef = useRef(sessionId);
+  sessionIdRef.current = sessionId;
 
+  // Auto-resize textarea
   useEffect(() => {
     const ta = textareaRef.current;
     if (ta) {
@@ -106,6 +161,7 @@ export function OLChatThread({ projects, defaultProjectId }: Props) {
     }
   }, [input]);
 
+  // Auto-scroll on new messages
   useEffect(() => {
     scrollRef.current?.scrollTo({
       top: scrollRef.current.scrollHeight,
@@ -113,10 +169,30 @@ export function OLChatThread({ projects, defaultProjectId }: Props) {
     });
   }, [messages]);
 
+  // Load sessions from localStorage on mount
   useEffect(() => {
-    void refreshConversations();
+    setSessions(readSessions());
   }, []);
 
+  // Auto-save the current session whenever messages change
+  useEffect(() => {
+    if (messages.length === 0) return;
+    const firstUser = messages.find((m) => m.role === "user") as UserMsg | undefined;
+    const title = firstUser
+      ? firstUser.text.slice(0, 60)
+      : "Untitled session";
+    const session: Session = {
+      id: sessionIdRef.current,
+      title,
+      messages,
+      createdAt: messages[0]?.ts ?? Date.now(),
+      lastOpenedAt: Date.now(),
+    };
+    upsertSession(session);
+    setSessions(readSessions());
+  }, [messages]);
+
+  // SSE stream for live agent actions
   useEffect(() => {
     const es = new EventSource(`${API_URL}/chat/actions/stream`);
     es.onmessage = (e) => {
@@ -130,77 +206,37 @@ export function OLChatThread({ projects, defaultProjectId }: Props) {
     return () => sseRef.current?.close();
   }, []);
 
-  async function refreshConversations(): Promise<Conversation[]> {
-    try {
-      const res = await authFetch(`${API_URL}/chat/conversations`);
-      if (res.ok) {
-        const list: Conversation[] = await res.json();
-        setConversations(list);
-        if (list.length && !activeConvId) {
-          setActiveConvId(list[0].id);
-          await loadHistory(list[0].id);
-        }
-        return list;
-      }
-    } catch {}
-    return [];
+  // ---- Session management ------------------------------------------------
+
+  function startNewChat() {
+    // Current messages are already auto-saved — just reset state
+    setSessionId(newId());
+    setMessages([]);
+    setInput("");
+    setTab("run");
   }
 
-  async function loadHistory(convId: string) {
-    try {
-      const res = await authFetch(
-        `${API_URL}/chat/history?conversation_id=${convId}`,
-      );
-      if (res.ok) {
-        const rows: { role: string; content: string }[] = await res.json();
-        setMessages(
-          rows.map((r, i): Msg => ({
-            role: r.role === "assistant" ? "assistant" : "user",
-            text: r.content,
-            ts: Date.now() + i,
-            ...(r.role === "assistant" ? { status: "done" as const } : {}),
-          } as Msg)),
-        );
-      }
-    } catch {
+  function loadSession(session: Session) {
+    // Update lastOpenedAt and persist
+    const updated: Session = { ...session, lastOpenedAt: Date.now() };
+    upsertSession(updated);
+    setSessions(readSessions());
+    setSessionId(updated.id);
+    setMessages(updated.messages);
+    setTab("run");
+  }
+
+  function removeSession(id: string) {
+    deleteSessionById(id);
+    setSessions(readSessions());
+    // If we deleted the active session, start fresh
+    if (id === sessionIdRef.current) {
+      setSessionId(newId());
       setMessages([]);
     }
   }
 
-  async function newConversation() {
-    const res = await authFetch(`${API_URL}/chat/conversations`, {
-      method: "POST",
-      body: JSON.stringify({
-        title: "New chat",
-        mode: agentMode ? "agent" : "intel",
-      }),
-    });
-    if (res.ok) {
-      const created: Conversation = await res.json();
-      setConversations((prev) => [created, ...prev]);
-      setActiveConvId(created.id);
-      setMessages([]);
-    }
-  }
-
-  async function deleteConversation(id: string) {
-    await authFetch(`${API_URL}/chat/conversations/${id}`, {
-      method: "DELETE",
-    });
-    const remaining = conversations.filter((c) => c.id !== id);
-    setConversations(remaining);
-    if (activeConvId === id) {
-      const next = remaining[0]?.id ?? null;
-      setActiveConvId(next);
-      if (next) await loadHistory(next);
-      else setMessages([]);
-    }
-  }
-
-  async function selectConversation(id: string) {
-    setActiveConvId(id);
-    await loadHistory(id);
-  }
+  // ---- Send ---------------------------------------------------------------
 
   async function send() {
     const text = input.trim();
@@ -261,12 +297,102 @@ export function OLChatThread({ projects, defaultProjectId }: Props) {
   if (projects.length === 0) {
     return (
       <div className="card muted">
-        No projects yet. Seed the database or create a project to start using
-        the orchestrator.
+        No projects yet. Seed the database or create a project to start.
       </div>
     );
   }
 
+  // ---- Render -------------------------------------------------------------
+
+  return (
+    <div className="ol-interface">
+      {/* Tab bar + New chat */}
+      <div className="ol-iface-topbar">
+        <div className="ol-tabs-bar">
+          <button
+            type="button"
+            className={`ol-tab ${tab === "run" ? "active" : ""}`}
+            onClick={() => setTab("run")}
+          >
+            Chat
+          </button>
+          <button
+            type="button"
+            className={`ol-tab ${tab === "history" ? "active" : ""}`}
+            onClick={() => {
+              setSessions(readSessions());
+              setTab("history");
+            }}
+          >
+            History
+            {sessions.length > 0 && (
+              <span className="ol-tab-count">{sessions.length}</span>
+            )}
+          </button>
+        </div>
+        <button
+          type="button"
+          className="btn"
+          onClick={startNewChat}
+          title="Start a new conversation"
+        >
+          + New chat
+        </button>
+      </div>
+
+      {/* Panels */}
+      {tab === "run" ? (
+        <RunTab
+          messages={messages}
+          input={input}
+          busy={busy}
+          agentMode={agentMode}
+          actions={actions}
+          scrollRef={scrollRef}
+          textareaRef={textareaRef}
+          onInputChange={setInput}
+          onAgentModeChange={setAgentMode}
+          onSend={send}
+        />
+      ) : (
+        <HistoryTab
+          sessions={sessions}
+          activeSessionId={sessionId}
+          onLoad={loadSession}
+          onDelete={removeSession}
+        />
+      )}
+    </div>
+  );
+}
+
+// ---- Run tab --------------------------------------------------------------
+
+interface RunTabProps {
+  messages: Msg[];
+  input: string;
+  busy: boolean;
+  agentMode: boolean;
+  actions: AgentAction[];
+  scrollRef: React.RefObject<HTMLDivElement | null>;
+  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  onInputChange: (v: string) => void;
+  onAgentModeChange: (v: boolean) => void;
+  onSend: () => void;
+}
+
+function RunTab({
+  messages,
+  input,
+  busy,
+  agentMode,
+  actions,
+  scrollRef,
+  textareaRef,
+  onInputChange,
+  onAgentModeChange,
+  onSend,
+}: RunTabProps) {
   const isEmpty = messages.length === 0;
 
   return (
@@ -274,105 +400,13 @@ export function OLChatThread({ projects, defaultProjectId }: Props) {
       className="ol-thread"
       style={{
         display: "grid",
-        gridTemplateColumns: "220px 1fr 260px",
+        gridTemplateColumns: "1fr 260px",
         gap: 12,
         alignItems: "stretch",
       }}
     >
-      {/* Conversations sidebar */}
-      <aside
-        style={{
-          background: "var(--bg-elev)",
-          border: "1px solid var(--border)",
-          borderRadius: "var(--radius)",
-          overflow: "hidden",
-          display: "flex",
-          flexDirection: "column",
-          maxHeight: "78vh",
-        }}
-      >
-        <div style={{ padding: 8, borderBottom: "1px solid var(--border)" }}>
-          <button
-            onClick={newConversation}
-            className="btn btn-primary"
-            style={{ width: "100%", padding: "7px 10px", fontSize: 12 }}
-          >
-            + New chat
-          </button>
-        </div>
-        <div style={{ flex: 1, overflowY: "auto", padding: 6 }}>
-          {conversations.length === 0 && (
-            <p
-              style={{
-                fontSize: 11,
-                color: "var(--text-muted)",
-                textAlign: "center",
-                marginTop: 16,
-              }}
-            >
-              No conversations yet
-            </p>
-          )}
-          {conversations.map((c) => {
-            const isActive = c.id === activeConvId;
-            return (
-              <div
-                key={c.id}
-                onClick={() => selectConversation(c.id)}
-                style={{
-                  padding: "7px 9px",
-                  marginBottom: 2,
-                  borderRadius: 5,
-                  background: isActive ? "var(--accent-soft)" : "transparent",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 4,
-                }}
-              >
-                <div style={{ flex: 1, overflow: "hidden" }}>
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: "var(--text)",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {c.title}
-                  </div>
-                  <div style={{ fontSize: 10, color: "var(--text-muted)" }}>
-                    {c.mode} · {c.message_count ?? 0} msg
-                  </div>
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (confirm(`Delete "${c.title}"?`))
-                      void deleteConversation(c.id);
-                  }}
-                  style={{
-                    background: "transparent",
-                    color: "var(--text-faint)",
-                    border: "none",
-                    cursor: "pointer",
-                    fontSize: 14,
-                    padding: 2,
-                  }}
-                  title="Delete"
-                >
-                  ×
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      </aside>
-
-      {/* Chat thread */}
-      <div style={{ display: "flex", flexDirection: "column", minHeight: "78vh" }}>
+      {/* Chat column */}
+      <div style={{ display: "flex", flexDirection: "column", minHeight: "72vh" }}>
         <OLPagePanels />
 
         <div
@@ -389,7 +423,7 @@ export function OLChatThread({ projects, defaultProjectId }: Props) {
                     key={p}
                     type="button"
                     className="ol-example-prompt"
-                    onClick={() => setInput(p)}
+                    onClick={() => onInputChange(p)}
                   >
                     {p}
                   </button>
@@ -413,7 +447,7 @@ export function OLChatThread({ projects, defaultProjectId }: Props) {
           className="ol-thread-input"
           onSubmit={(e) => {
             e.preventDefault();
-            void send();
+            onSend();
           }}
         >
           <div
@@ -426,24 +460,14 @@ export function OLChatThread({ projects, defaultProjectId }: Props) {
               color: "var(--text-muted)",
             }}
           >
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                cursor: "pointer",
-              }}
-            >
+            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
               <input
                 type="checkbox"
                 checked={agentMode}
-                onChange={(e) => setAgentMode(e.target.checked)}
+                onChange={(e) => onAgentModeChange(e.target.checked)}
                 style={{ width: 12, height: 12 }}
               />
-              agent mode{" "}
-              {agentMode
-                ? "(can read + write)"
-                : "(read-only)"}
+              agent mode {agentMode ? "(can read + write)" : "(read-only)"}
             </label>
           </div>
           <div className="ol-chat-input-wrapper">
@@ -453,19 +477,15 @@ export function OLChatThread({ projects, defaultProjectId }: Props) {
               value={input}
               placeholder="Ask a question or describe a task..."
               disabled={busy}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => onInputChange(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
-                  void send();
+                  onSend();
                 }
               }}
             />
-            <button
-              type="submit"
-              disabled={busy || !input.trim()}
-              aria-label="Send"
-            >
+            <button type="submit" disabled={busy || !input.trim()} aria-label="Send">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                 <path
                   d="M7 11L12 6L17 11M12 18V7"
@@ -488,7 +508,7 @@ export function OLChatThread({ projects, defaultProjectId }: Props) {
           borderRadius: "var(--radius)",
           padding: 12,
           overflowY: "auto",
-          maxHeight: "78vh",
+          maxHeight: "72vh",
           display: "flex",
           flexDirection: "column",
         }}
@@ -515,9 +535,7 @@ export function OLChatThread({ projects, defaultProjectId }: Props) {
           <span
             style={{
               fontSize: 10,
-              background: actions.length
-                ? "var(--accent-soft)"
-                : "var(--neutral-100)",
+              background: actions.length ? "var(--accent-soft)" : "var(--neutral-100)",
               color: actions.length ? "var(--accent)" : "var(--text-muted)",
               padding: "1px 7px",
               borderRadius: "var(--radius-pill)",
@@ -527,15 +545,8 @@ export function OLChatThread({ projects, defaultProjectId }: Props) {
           </span>
         </div>
         {actions.length === 0 ? (
-          <p
-            style={{
-              fontSize: 11,
-              color: "var(--text-muted)",
-              lineHeight: 1.5,
-            }}
-          >
-            No actions yet. Ask the agent to do something and they'll appear
-            here in real time.
+          <p style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.5 }}>
+            No actions yet. Ask the agent to do something and they'll appear here in real time.
           </p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -550,20 +561,8 @@ export function OLChatThread({ projects, defaultProjectId }: Props) {
                   borderRadius: 4,
                 }}
               >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <span
-                    style={{
-                      color: actionColor(a.status),
-                      fontWeight: 600,
-                      fontFamily: "var(--mono)",
-                    }}
-                  >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ color: actionColor(a.status), fontWeight: 600, fontFamily: "var(--mono)" }}>
                     {a.tool}
                   </span>
                   <span style={{ color: "var(--text-faint)", fontSize: 9 }}>
@@ -571,14 +570,7 @@ export function OLChatThread({ projects, defaultProjectId }: Props) {
                   </span>
                 </div>
                 {a.summary && a.status !== "running" && (
-                  <div
-                    style={{
-                      color: "var(--text-muted)",
-                      fontSize: 10,
-                      marginTop: 2,
-                      lineHeight: 1.4,
-                    }}
-                  >
+                  <div style={{ color: "var(--text-muted)", fontSize: 10, marginTop: 2, lineHeight: 1.4 }}>
                     {a.summary.slice(0, 110)}
                   </div>
                 )}
@@ -590,6 +582,83 @@ export function OLChatThread({ projects, defaultProjectId }: Props) {
     </div>
   );
 }
+
+// ---- History tab ----------------------------------------------------------
+
+interface HistoryTabProps {
+  sessions: Session[];
+  activeSessionId: string;
+  onLoad: (s: Session) => void;
+  onDelete: (id: string) => void;
+}
+
+function HistoryTab({ sessions, activeSessionId, onLoad, onDelete }: HistoryTabProps) {
+  // sessions already sorted by lastOpenedAt desc from readSessions()
+  const sorted = [...sessions].sort((a, b) => b.lastOpenedAt - a.lastOpenedAt);
+
+  if (sorted.length === 0) {
+    return (
+      <div className="card muted" style={{ marginTop: 12 }}>
+        No saved conversations yet. Start chatting and your sessions will appear here.
+      </div>
+    );
+  }
+
+  return (
+    <div className="ol-history-list">
+      {sorted.map((s) => {
+        const isActive = s.id === activeSessionId;
+        const userMsgs = s.messages.filter((m) => m.role === "user") as UserMsg[];
+        const lastMsg = userMsgs[userMsgs.length - 1];
+        const date = new Date(s.lastOpenedAt);
+        const dateStr = isToday(date)
+          ? date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+          : date.toLocaleDateString([], { month: "short", day: "numeric" });
+
+        return (
+          <div
+            key={s.id}
+            className={`ol-history-item ${isActive ? "active" : ""}`}
+            onClick={() => onLoad(s)}
+          >
+            <div className="ol-history-item-main">
+              <div className="ol-history-item-title">{s.title}</div>
+              {lastMsg && lastMsg.text !== s.title && (
+                <div className="ol-history-item-preview">{lastMsg.text.slice(0, 80)}</div>
+              )}
+              <div className="ol-history-item-meta">
+                {userMsgs.length} message{userMsgs.length !== 1 ? "s" : ""} · {dateStr}
+              </div>
+            </div>
+            <button
+              type="button"
+              className="ol-history-item-delete"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (confirm("Delete this conversation?")) onDelete(s.id);
+              }}
+              title="Delete"
+              aria-label="Delete conversation"
+            >
+              ×
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function isToday(date: Date): boolean {
+  const now = new Date();
+  return (
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate()
+  );
+}
+
+// ---- Message bubbles ------------------------------------------------------
 
 function UserBubble({ msg }: { msg: UserMsg }) {
   return (
@@ -626,40 +695,24 @@ function AssistantBubble({ msg }: { msg: AssistantMsg }) {
     <div className="ol-msg ol-msg-assistant">
       <div className="ol-msg-bubble">
         <div className="ol-msg-meta">
-          <span className="tag tag-blue">
-            {ROUTE_LABELS[route] ?? route}
-          </span>
-          <span className={`tag ${RISK_TINTS[risk] ?? "tag-grey"}`}>
-            risk: {risk}
-          </span>
+          <span className="tag tag-blue">{ROUTE_LABELS[route] ?? route}</span>
+          <span className={`tag ${RISK_TINTS[risk] ?? "tag-grey"}`}>risk: {risk}</span>
           {msg.laneStatus && (
             <span className="tag tag-grey">lane: {msg.laneStatus}</span>
           )}
         </div>
-        {msg.reasoning && (
-          <p className="ol-msg-reasoning">{msg.reasoning}</p>
-        )}
+        {msg.reasoning && <p className="ol-msg-reasoning">{msg.reasoning}</p>}
         {msg.blockedReason && (
           <p className="ol-msg-blocked">Blocked: {msg.blockedReason}</p>
         )}
         <div className="ol-msg-links">
           {msg.prUrl && (
-            <a
-              href={msg.prUrl}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="tag tag-link"
-            >
+            <a href={msg.prUrl} target="_blank" rel="noreferrer noopener" className="tag tag-link">
               PR ↗
             </a>
           )}
           {msg.jiraCommentUrl && (
-            <a
-              href={msg.jiraCommentUrl}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="tag tag-link"
-            >
+            <a href={msg.jiraCommentUrl} target="_blank" rel="noreferrer noopener" className="tag tag-link">
               Jira comment ↗
             </a>
           )}
