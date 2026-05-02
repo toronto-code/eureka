@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../api";
+import type { AgentTaskSummary } from "../api";
 
 interface Message {
   role: "user" | "agent" | "system";
@@ -7,9 +8,48 @@ interface Message {
   correlation_id?: string;
 }
 
+const TERMINAL = new Set(["succeeded", "failed", "cancelled"]);
+
+async function pollUntilTerminal(agentId: string, taskId: string): Promise<AgentTaskSummary> {
+  let delayMs = 200;
+  const deadline = Date.now() + 60_000;
+  while (Date.now() < deadline) {
+    const t = await api.agentTask(agentId, taskId);
+    if (TERMINAL.has(t.status)) {
+      return t;
+    }
+    await new Promise((r) => setTimeout(r, delayMs));
+    delayMs = Math.min(Math.floor(delayMs * 1.2), 2000);
+  }
+  throw new Error("Timed out waiting for agent task (60s).");
+}
+
+function formatAgentReply(task: AgentTaskSummary): string {
+  if (task.status === "failed") {
+    return task.error ?? "Agent task failed.";
+  }
+  if (task.status === "cancelled") {
+    return "Task was cancelled.";
+  }
+  const res = task.result;
+  if (
+    res &&
+    typeof res === "object" &&
+    "summary" in res &&
+    typeof (res as { summary: unknown }).summary === "string"
+  ) {
+    return (res as { summary: string }).summary;
+  }
+  return res !== undefined ? JSON.stringify(res) : "(no body)";
+}
+
 export function Chat() {
   const [messages, setMessages] = useState<Message[]>([
-    { role: "system", text: "Mycelium agent ready. Ask anything about your codebase, team, or processes." },
+    {
+      role: "system",
+      text:
+        "Mycelium agent runs tasks via Redis. Replies shown here poll GET /agents/{id}/tasks/{task_id} until succeeded or failed.",
+    },
   ]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -25,9 +65,18 @@ export function Chat() {
       setMessages((m) => [
         ...m,
         {
-          role: "agent",
-          text: `task ${r.task_id} dispatched (correlation_id=${r.correlation_id})`,
+          role: "system",
+          text: `Queued ${r.task_id} — waiting for agent-runtime…`,
           correlation_id: r.correlation_id,
+        },
+      ]);
+      const task = await pollUntilTerminal(r.agent_id, r.task_id);
+      setMessages((m) => [
+        ...m,
+        {
+          role: "agent",
+          text: formatAgentReply(task),
+          correlation_id: task.correlation_id,
         },
       ]);
     } catch (e) {

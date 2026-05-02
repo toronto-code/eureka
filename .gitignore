@@ -1,6 +1,8 @@
-# Env
+# Env (never commit real secrets — only `.env.example` is tracked)
 .env
-.env.*.local
+.env.*
+!.env.example
+*.env.backup
 
 # Python
 __pycache__/
@@ -35,3 +37,10 @@ logs/
 
 # Docker volumes (if mounted locally)
 .data/
+
+# Secrets / tooling artifacts never committed individually
+**/secrets.*
+coverage.xml
+coverage/
+htmlcov/
+*.pem

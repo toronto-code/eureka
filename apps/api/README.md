@@ -7,10 +7,12 @@ The Mycelium API gateway. **The only thing the frontend talks to.**
 | Method | Path                     | Notes                                                   |
 | ------ | ------------------------ | ------------------------------------------------------- |
 | GET    | `/health`                | Standard `HealthCheck` shape (see shared-types).        |
-| POST   | `/chat`                  | Routes prompts to the agent-runtime via `agents.tasks`. |
+| POST   | `/chat`                  | Inserts `agent_tasks` (`queued`), then publishes to `agents.tasks`. Response includes `agent_id` + `task_id` for polling. |
 | GET    | `/graph`                 | Query knowledge graph. Params: `limit`, `depth`, `node_id`. |
 | GET    | `/agents`                | List agents owned by the current user.                  |
-| POST   | `/agents/{id}/tasks`     | Dispatch an `AgentTask`.                                |
+| POST   | `/agents/{id}/tasks`     | Inserts task row (`queued`), then publishes to Redis. Agents are created lazily when missing (owned by caller). |
+| GET    | `/agents/{id}/tasks`      | Recent tasks for that agent (404 if caller does not own the agent). |
+| GET    | `/agents/{id}/tasks/{task_id}` | Read one task (`result`/`error` when terminal).   |
 | GET    | `/integrations`          | Read `integration_syncs` (read-only on this table).     |
 | POST   | `/integrations/ingest`   | Producer entrypoint for events that don't go via the bus directly. Adds correlation_id fallback (rule 3). |
 | GET    | `/workflows`             | List active workflows.                                  |
@@ -22,7 +24,7 @@ The Mycelium API gateway. **The only thing the frontend talks to.**
 | Direction | Topic              | Notes                                                   |
 | --------- | ------------------ | ------------------------------------------------------- |
 | Consumes  | `events.processed` | Ingestion worker writes to Postgres `events` table.     |
-| Consumes  | `agents.results`   | Updates `agent_tasks.status` + audit log.               |
+| Consumes  | `agents.results`   | Updates existing `agent_tasks` rows (+ audit log). Rows must exist before Redis dispatch — done by `/chat` and `/agents/{id}/tasks`. |
 | Consumes  | `graph.updates`    | Server-sent events to the frontend dashboard.           |
 | Publishes | `agents.tasks`     | From `/chat` and `/agents/{id}/tasks`.                  |
 | Publishes | `events.raw`       | When `/integrations/ingest` is used.                    |
@@ -37,8 +39,8 @@ Running in DEV_MODE — auth disabled
 
 ## Security
 
-`packages/security-filter` is applied to `/graph`, `/agents/*` and `/chat` responses
-before returning them to the user.
+`packages/security-filter` is applied inside `GET /graph` when merging knowledge graph
+responses for the caller. Other routes bypass that filter unless added explicitly.
 
 ## Data ownership
 

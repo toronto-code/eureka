@@ -56,5 +56,6 @@ async def _onboard(input_data: dict) -> dict:
 
 
 registry.register(Skill("summarize", "Summarize a prompt or document.", _summarize))
+registry.register(Skill("chat", "Interactive chat aligned with summarize stub.", _summarize))
 registry.register(Skill("triage", "Categorize and route an item.", _triage))
 registry.register(Skill("onboard", "Produce an onboarding briefing for a service.", _onboard))

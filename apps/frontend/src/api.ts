@@ -65,13 +65,24 @@ export const api = {
   agentTasks: (agentId: string) =>
     request<AgentTaskSummary[]>(`/agents/${encodeURIComponent(agentId)}/tasks`),
 
+  agentTask: (agentId: string, taskId: string) =>
+    request<AgentTaskSummary>(
+      `/agents/${encodeURIComponent(agentId)}/tasks/${encodeURIComponent(taskId)}`,
+    ),
+
   observability: () =>
     request<{ timestamp: string; services: { service: string; status: string; details: unknown }[] }>(
       "/observability",
     ),
 
   chat: (prompt: string, opts?: { agent_id?: string; correlation_id?: string }) =>
-    request<{ task_id: string; correlation_id: string; status: string; message: string }>("/chat", {
+    request<{
+      task_id: string;
+      agent_id: string;
+      correlation_id: string;
+      status: string;
+      message: string;
+    }>("/chat", {
       method: "POST",
       body: JSON.stringify({ prompt, ...opts }),
     }),
