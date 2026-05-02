@@ -10,6 +10,7 @@ import type {
   DocumentDetail,
   DocumentSummary,
   ExecutedAction,
+  IncomingOverview,
   IntegrationStatus,
   ObservabilityResponse,
   OLRunDetail,
@@ -72,6 +73,7 @@ export const api = {
         openai: false,
         jira: false,
         github: false,
+        slack: false,
         database: false,
         bot_jira_user: null,
         auto_execute_enabled: false,
@@ -80,8 +82,18 @@ export const api = {
         github_pat_storage_enabled: false,
         github_pat_saved_in_database: false,
         github_pat_hint: null,
+        diagnostics: {},
       },
     ),
+  incomingOverview: () =>
+    request<IncomingOverview>("/incoming/overview", {}, {
+      fetched_at: new Date().toISOString(),
+      github: { repos: [], commits: [], prs: [], issues: [] },
+      slack: { messages: [], user_map: {} },
+      jira: { issues: [] },
+      observer: { events: [] },
+      summary: {},
+    }),
   projectDataPreview: () =>
     request<ProjectDataPreview>("/settings/project_data", {}, {
       user_goal: null,

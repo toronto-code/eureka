@@ -27,6 +27,7 @@ from app.routes import (
     credentials,
     dashboard_web,
     docker_obs,
+    incoming,
     ingestion,
     ol,
     projects,
@@ -126,6 +127,7 @@ def create_app() -> FastAPI:
     app.include_router(agent_chat.router)
     app.include_router(docker_obs.router)
     app.include_router(dashboard_web.router)
+    app.include_router(incoming.router)
     return app
 
 

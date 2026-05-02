@@ -7,10 +7,19 @@ export type ApprovalStatus =
   | "APPROVED"
   | "REJECTED";
 
+export interface IntegrationDiagnostic {
+  ok: boolean;
+  status: "operational" | "not_configured" | "error";
+  missing: string[];
+  detail: string | null;
+  last_checked_at: string | null;
+}
+
 export interface IntegrationStatus {
   openai: boolean;
   jira: boolean;
   github: boolean;
+  slack: boolean;
   database: boolean;
   bot_jira_user: string | null;
   auto_execute_enabled: boolean;
@@ -19,6 +28,98 @@ export interface IntegrationStatus {
   github_pat_storage_enabled: boolean;
   github_pat_saved_in_database: boolean;
   github_pat_hint: string | null;
+  diagnostics: Record<string, IntegrationDiagnostic>;
+}
+
+export interface IncomingSourceSummary {
+  ok: boolean;
+  configured: boolean;
+  item_count: number;
+  reason: string | null;
+}
+
+export interface IncomingGitHubRepo {
+  name: string;
+  language: string | null;
+  owner: string;
+  description: string;
+}
+
+export interface IncomingGitHubCommit {
+  repo: string;
+  message: string;
+  author: string | null;
+  date: string | null;
+}
+
+export interface IncomingGitHubPR {
+  repo: string;
+  number: number;
+  title: string;
+  state: string;
+  merged: boolean;
+  author: string | null;
+}
+
+export interface IncomingGitHubIssue {
+  repo: string;
+  number: number;
+  title: string;
+  state: string;
+  author: string | null;
+  assignee: string | null;
+}
+
+export interface IncomingSlackMessage {
+  channel: string;
+  user: string;
+  userId?: string;
+  userEmail?: string | null;
+  text: string;
+  ts: string;
+  thread_ts?: string | null;
+  files?: Array<{
+    id: string;
+    name: string;
+    mimetype: string;
+    url_private?: string;
+  }>;
+}
+
+export interface IncomingJiraIssue {
+  key: string;
+  summary: string | null;
+  status: string | null;
+  assignee: string;
+  reporter: string | null;
+  priority: string | null;
+  type: string | null;
+  updated: string | null;
+}
+
+export interface IncomingObserverEvent {
+  type: string;
+  source: string | null;
+  actor: string | null;
+  object: string | null;
+  timestamp: string | null;
+}
+
+export interface IncomingOverview {
+  fetched_at: string;
+  github: {
+    repos: IncomingGitHubRepo[];
+    commits: IncomingGitHubCommit[];
+    prs: IncomingGitHubPR[];
+    issues: IncomingGitHubIssue[];
+  };
+  slack: {
+    messages: IncomingSlackMessage[];
+    user_map: Record<string, { name: string; email?: string | null }>;
+  };
+  jira: { issues: IncomingJiraIssue[] };
+  observer: { events: IncomingObserverEvent[] };
+  summary: Record<string, IncomingSourceSummary>;
 }
 
 export interface ExecutedAction {

@@ -850,6 +850,60 @@ LIVE CONTEXT below lists every repo, ticket, channel, team member. Don't ask "wh
 """
 
 
+def _build_web_sessions_context(limit: int = 5) -> str:
+    """Return a markdown block summarising the user's most recent web-recorded
+    sessions. Pulled from ``source_documents`` where ``source_type='web_session'``.
+
+    Silently returns an empty string on any failure — context enrichment is
+    best-effort and must never break the chat endpoint.
+    """
+    try:
+        from app.db import SessionLocal
+        from app.models import SourceDocument
+        from sqlalchemy import select
+
+        with SessionLocal() as session:
+            rows = session.execute(
+                select(SourceDocument)
+                .where(SourceDocument.source_type == "web_session")
+                .order_by(SourceDocument.created_at.desc())
+                .limit(limit)
+            ).scalars().all()
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("web session context unavailable: %s", exc)
+        return ""
+
+    if not rows:
+        return ""
+
+    parts: list[str] = [
+        "",
+        "RECENT USER WEB SESSIONS (what the user has been doing in the product UI;"
+        " use these to understand intent and ongoing workflows):",
+    ]
+    for doc in rows:
+        meta = doc.doc_metadata or {}
+        workflows = meta.get("workflows") or []
+        workflow_names = ", ".join(wf.get("name", "") for wf in workflows if wf.get("name"))
+        duration = meta.get("duration_seconds", 0)
+        events = meta.get("event_count", 0)
+        pages = meta.get("pages_visited") or []
+        parts.append("")
+        parts.append(f"  • {doc.title}")
+        parts.append(
+            f"    — duration {duration}s, {events} events, pages: {', '.join(pages[:6]) or '(none)'}"
+        )
+        if workflow_names:
+            parts.append(f"    — detected workflows: {workflow_names}")
+        summary = (doc.content or "").strip()
+        if summary:
+            parts.append("    — summary:")
+            snippet = summary[:800].replace("\n", "\n      ")
+            parts.append(f"      {snippet}")
+    parts.append("")
+    return "\n".join(parts)
+
+
 async def _build_live_context() -> str:
     """Pre-fetch real data so the agent doesn't have to discover it.
     Mirrors chat_intel's context — same commits, PRs, issues, slack, jira data."""
@@ -941,7 +995,7 @@ SLACK CHANNELS YOU CAN POST TO:
 
 TEAM MEMBERS (Slack display names):
   {", ".join(users[:20]) or "(none)"}
-
+{_build_web_sessions_context()}
 When the user asks who has the most commits, who is working on what, what PRs are open, etc — answer directly from the data above. Do NOT say you don't have access; the data is right here.
 """
     except Exception as e:
