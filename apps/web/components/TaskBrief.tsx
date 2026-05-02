@@ -1,7 +1,16 @@
+import Link from "next/link";
+
 import { RiskBadge } from "@/components/RiskBadge";
 import type { OrchestratorOutput } from "@/lib/types";
 
-export function TaskBrief({ output }: { output: OrchestratorOutput }) {
+export function TaskBrief({
+  output,
+  taskDbId,
+}: {
+  output: OrchestratorOutput;
+  /** Internal tasks.id when this run is tied to a row (demo seed sets this). */
+  taskDbId?: string | null;
+}) {
   const understanding = output.task_understanding;
   return (
     <div className="card">
@@ -40,9 +49,14 @@ export function TaskBrief({ output }: { output: OrchestratorOutput }) {
           )}
         </div>
       </div>
-      <div className="flex" style={{ marginTop: 12 }}>
+      <div className="flex" style={{ marginTop: 12, flexWrap: "wrap", gap: 12 }}>
         <RiskBadge risk={output.risk_classification.overall_risk} />
         <span className="muted">{output.risk_classification.reasoning}</span>
+        {taskDbId ? (
+          <Link href={`/tasks/${taskDbId}`} className="btn">
+            View task record
+          </Link>
+        ) : null}
       </div>
     </div>
   );

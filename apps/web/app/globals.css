@@ -279,6 +279,11 @@ button {
   border-color: var(--border-strong);
 }
 
+.row > a.btn {
+  flex-shrink: 0;
+  align-self: center;
+}
+
 .row .meta {
   color: var(--text-muted);
   font-size: 12px;
@@ -564,3 +569,60 @@ textarea {
 .back-link { color: var(--text-muted); text-decoration: none; font-size: 13px; display: inline-block; margin-bottom: 12px; }
 .back-link:hover { color: var(--text); }
 .muted { color: var(--text-muted); }
+
+/* Long-running actions (orchestration, watcher) — avoid clicks + show progress */
+.busy-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(7, 9, 14, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.busy-overlay-card {
+  width: min(420px, calc(100vw - 48px));
+  padding: 28px 26px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elev);
+  box-shadow: var(--shadow);
+  text-align: center;
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+}
+
+.busy-overlay-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 4px 0 0;
+}
+
+.busy-overlay-hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.busy-overlay-elapsed {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--border-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: busy-spin 0.75s linear infinite;
+}
+
+@keyframes busy-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

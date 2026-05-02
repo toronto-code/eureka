@@ -5,6 +5,11 @@
 # (apps/api/app) + Next.js frontend (apps/web).
 #
 # `docker-compose.legacy.yml` keeps the older multi-service experiment alive.
+#
+# If Settings shows every integration as "not configured" and `/agents/*` 404s,
+# the `api` container is likely still an OLD image (legacy Dockerfile). Run:
+#   docker compose build api --no-cache && docker compose up
+# Explicit image names below avoid reusing that legacy image by mistake.
 # -----------------------------------------------------------------------------
 
 services:
@@ -25,6 +30,7 @@ services:
       retries: 20
 
   api:
+    image: mycelium-mvp-api:latest
     build:
       context: .
       dockerfile: apps/api/Dockerfile.mycelium
@@ -42,6 +48,8 @@ services:
       JIRA_PROJECT_KEY: ${JIRA_PROJECT_KEY:-}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       GITHUB_OWNER: ${GITHUB_OWNER:-}
+      # Legacy stack uses GITHUB_ORG; MVP treats it like GITHUB_OWNER when OWNER is unset.
+      GITHUB_ORG: ${GITHUB_ORG:-}
       GITHUB_REPO: ${GITHUB_REPO:-}
       GITHUB_DEFAULT_BASE_BRANCH: ${GITHUB_DEFAULT_BASE_BRANCH:-main}
       GITHUB_ALLOWED_WRITE_PATHS: ${GITHUB_ALLOWED_WRITE_PATHS:-}
@@ -70,6 +78,7 @@ services:
       retries: 20
 
   web:
+    image: mycelium-mvp-web:latest
     build:
       context: ./apps/web
       dockerfile: Dockerfile

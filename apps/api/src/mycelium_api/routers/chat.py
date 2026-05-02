@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import logging
 import uuid
+from typing import Any
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from mycelium_api.agent_dispatch import persist_and_publish_task
 from mycelium_api.auth import CurrentUser, get_current_user
@@ -16,12 +17,29 @@ from mycelium_shared_types.correlation import derive_correlation_id
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chat", tags=["chat"])
 
-_CHAT_AGENT_CAPS = ["chat", "summarize", "triage", "onboard"]
+# Orchestrator + specialists the runtime may run under one logical agent
+_CHAT_AGENT_CAPS = [
+    "project_orchestrator",
+    "chat",
+    "summarize",
+    "triage",
+    "onboard",
+    "reasoning",
+    "plan",
+]
 
 
 class ChatRequest(BaseModel):
     prompt: str
     agent_id: str | None = None
+    agent_type: str = Field(
+        default="project_orchestrator",
+        description="Skill name in agent-runtime. Use `chat` for the legacy echo stub.",
+    )
+    project_data: dict[str, Any] | None = Field(
+        default=None,
+        description="Optional whole-project bundle (placeholder until unified project API exists).",
+    )
     correlation_id: str | None = None
     parent_correlation_id: str | None = None
 
@@ -48,14 +66,16 @@ async def chat(req: ChatRequest, user: CurrentUser = Depends(get_current_user)) 
         source="api.chat", object_id=task_id
     )
 
-    input_data = {"prompt": req.prompt, "user_id": user.id}
+    input_data: dict[str, Any] = {"prompt": req.prompt, "user_id": user.id}
+    if req.project_data is not None:
+        input_data["project_data"] = req.project_data
 
     bus = get_event_bus()
     await persist_and_publish_task(
         bus=bus,
         task_id=task_id,
         agent_id=agent_id,
-        agent_type="chat",
+        agent_type=req.agent_type,
         input_data=input_data,
         correlation_id=correlation_id,
         parent_correlation_id=req.parent_correlation_id,

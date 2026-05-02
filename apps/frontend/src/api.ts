@@ -75,7 +75,16 @@ export const api = {
       "/observability",
     ),
 
-  chat: (prompt: string, opts?: { agent_id?: string; correlation_id?: string }) =>
+  chat: (
+    prompt: string,
+    opts?: {
+      agent_id?: string;
+      correlation_id?: string;
+      /** Default API skill is project_orchestrator; use `chat` for legacy stub */
+      agent_type?: string;
+      project_data?: Record<string, unknown>;
+    },
+  ) =>
     request<{
       task_id: string;
       agent_id: string;

@@ -54,7 +54,9 @@ class AgentTask(BaseModel):
 
     task_id: str
     agent_id: str
-    agent_type: str = Field(description="Class of agent: triage | onboard | code-review | ...")
+    agent_type: str = Field(
+        description="Runtime skill: project_orchestrator (default) | chat | triage | …"
+    )
     input_data: dict[str, Any] = Field(default_factory=dict)
 
     correlation_id: str = Field(description="Mandatory. Same rules as MyceliumEvent.")

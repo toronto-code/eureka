@@ -12,6 +12,7 @@ from fastapi import FastAPI
 
 from mycelium_agent_runtime.approvals import run_approvals_consumer
 from mycelium_agent_runtime.learning_client import LearningClient
+from mycelium_agent_runtime.agents.catalog import list_personas
 from mycelium_agent_runtime.skills import registry
 from mycelium_agent_runtime.worker import (
     run_task_worker,
@@ -86,6 +87,22 @@ async def health() -> HealthCheck:
 async def list_skills() -> list[dict[str, str]]:
     """List all registered skills."""
     return registry.describe()
+
+
+@app.get("/agents/personas")
+async def list_agent_personas() -> list[dict[str, Any]]:
+    """Logical GPT agents (orchestrator + specialists). Maps to skills + prompts."""
+    return [
+        {
+            "id": p.id,
+            "title": p.title,
+            "description": p.description,
+            "default_skill": p.default_skill,
+            "system_prompt": p.system_prompt,
+            "tags": sorted(p.tags),
+        }
+        for p in list_personas()
+    ]
 
 
 @app.get("/permissions")
