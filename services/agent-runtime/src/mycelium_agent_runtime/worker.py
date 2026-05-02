@@ -91,6 +91,33 @@ async def _execute(
     return result
 
 
+def _is_pending_approval(result: dict[str, Any] | None, executor: ActionExecutor) -> bool:
+    """Detect whether a skill result or execution history indicates pending approval."""
+    if isinstance(result, dict) and result.get("pending_approval"):
+        return True
+
+    for _action, action_result in executor.get_history():
+        if action_result.metadata.get("pending_approval"):
+            return True
+
+    return False
+
+
+def _extract_pending_actions(executor: ActionExecutor) -> list[dict[str, Any]]:
+    """Extract pending approval actions from executor history."""
+    pending: list[dict[str, Any]] = []
+    for action, action_result in executor.get_history():
+        if action_result.metadata.get("pending_approval"):
+            pending.append({
+                "action_id": action.id,
+                "type": action.type.value,
+                "payload": action.payload,
+                "reasoning": action.reasoning,
+                "reason": action_result.metadata.get("reason"),
+            })
+    return pending
+
+
 async def _publish_result(
     bus: EventBus,
     task: dict[str, Any],
@@ -109,6 +136,33 @@ async def _publish_result(
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
     await bus.publish(Topic.AGENTS_RESULTS, payload, correlation_id=task["correlation_id"])
+
+
+async def _publish_approval_request(
+    bus: EventBus,
+    task: dict[str, Any],
+    pending_actions: list[dict[str, Any]],
+) -> None:
+    """Publish an approval request on workflows.approvals.
+
+    Uses `decision="requested"` to distinguish from approve/reject decisions
+    published by the API. Downstream consumers (UI, Julian's orchestration)
+    can present the pending actions to a human for approval.
+    """
+    payload = {
+        "id": f"approval-{task['task_id']}",
+        "workflow_id": task["task_id"],
+        "decision": "requested",
+        "task_id": task["task_id"],
+        "agent_id": task.get("agent_id"),
+        "pending_actions": pending_actions,
+        "correlation_id": task["correlation_id"],
+        "parent_correlation_id": task.get("parent_correlation_id"),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    await bus.publish(
+        Topic.WORKFLOWS_APPROVALS, payload, correlation_id=task["correlation_id"]
+    )
 
 
 async def run_task_worker(
@@ -146,15 +200,45 @@ async def run_task_worker(
         try:
             await _publish_result(bus, payload, AgentTaskStatus.RUNNING, None, None)
 
-            context = await _query_knowledge(
-                payload.get("input_data", {}).get("prompt", "")
-            )
+            input_data = payload.get("input_data") or {}
+            auto_approve_ids = input_data.get("auto_approve_action_ids") or []
+            if auto_approve_ids:
+                executor.set_auto_approve_action_ids(auto_approve_ids)
+                logger.info(
+                    "Task %s has %d pre-approved actions",
+                    task_id,
+                    len(auto_approve_ids),
+                )
+
+            context = await _query_knowledge(input_data.get("prompt", ""))
             result = await _execute(payload, executor, context)
 
-            executor.clear_history()
+            if _is_pending_approval(result, executor):
+                pending_actions = _extract_pending_actions(executor)
+                enriched_result = {
+                    **(result if isinstance(result, dict) else {}),
+                    "pending_actions": pending_actions,
+                    "pending_approval": True,
+                    "resume_instructions": (
+                        "POST /workflows/approvals with workflow_id=<task_id> and decision=approve|reject "
+                        "to unblock this task."
+                    ),
+                }
+                await _publish_result(
+                    bus, payload, AgentTaskStatus.PENDING_APPROVAL, enriched_result, None
+                )
+                await _publish_approval_request(bus, payload, pending_actions)
+                logger.info(
+                    "Task pending approval: %s (%d actions)",
+                    task_id,
+                    len(pending_actions),
+                )
+            else:
+                await _publish_result(bus, payload, AgentTaskStatus.SUCCEEDED, result, None)
+                logger.info("Task succeeded: %s", task_id)
 
-            await _publish_result(bus, payload, AgentTaskStatus.SUCCEEDED, result, None)
-            logger.info("Task succeeded: %s", task_id)
+            executor.clear_history()
+            executor.clear_auto_approve()
 
         except Exception as exc:
             logger.exception("Task failed: %s", task_id)

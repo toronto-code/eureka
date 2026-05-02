@@ -13,8 +13,8 @@ export interface Agent {
  * Lifecycle states. Transitions are strict — see {@link VALID_AGENT_TASK_TRANSITIONS}.
  *
  *   queued           → running | pending_approval | cancelled
- *   pending_approval → running | cancelled
- *   running          → succeeded | failed
+ *   pending_approval → running | failed | cancelled
+ *   running          → succeeded | failed | pending_approval
  *   failed           → retried   | cancelled
  *   retried          → succeeded | cancelled
  */

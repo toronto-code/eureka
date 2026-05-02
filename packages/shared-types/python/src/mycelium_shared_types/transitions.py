@@ -12,9 +12,14 @@ VALID_AGENT_TASK_TRANSITIONS: dict[AgentTaskStatus, set[AgentTaskStatus]] = {
     },
     AgentTaskStatus.PENDING_APPROVAL: {
         AgentTaskStatus.RUNNING,
+        AgentTaskStatus.FAILED,
         AgentTaskStatus.CANCELLED,
     },
-    AgentTaskStatus.RUNNING: {AgentTaskStatus.SUCCEEDED, AgentTaskStatus.FAILED},
+    AgentTaskStatus.RUNNING: {
+        AgentTaskStatus.SUCCEEDED,
+        AgentTaskStatus.FAILED,
+        AgentTaskStatus.PENDING_APPROVAL,
+    },
     AgentTaskStatus.FAILED: {AgentTaskStatus.RETRIED, AgentTaskStatus.CANCELLED},
     AgentTaskStatus.RETRIED: {AgentTaskStatus.SUCCEEDED, AgentTaskStatus.CANCELLED},
     AgentTaskStatus.SUCCEEDED: set(),

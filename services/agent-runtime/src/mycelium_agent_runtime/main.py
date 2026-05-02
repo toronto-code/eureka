@@ -10,6 +10,7 @@ from typing import Any
 
 from fastapi import FastAPI
 
+from mycelium_agent_runtime.approvals import run_approvals_consumer
 from mycelium_agent_runtime.skills import registry
 from mycelium_agent_runtime.worker import run_task_worker, _create_backend, _create_executor
 from mycelium_shared_types.health import HealthCheck, ok
@@ -37,16 +38,21 @@ async def lifespan(_app: FastAPI):
 
     logger.info("Initialized execution backend: %s", type(_backend).__name__)
 
-    task = asyncio.create_task(
+    worker_task = asyncio.create_task(
         run_task_worker(backend=_backend, executor=_executor),
         name="agent-runtime-worker",
+    )
+    approvals_task = asyncio.create_task(
+        run_approvals_consumer(),
+        name="agent-runtime-approvals",
     )
 
     try:
         yield
     finally:
-        task.cancel()
-        await asyncio.gather(task, return_exceptions=True)
+        worker_task.cancel()
+        approvals_task.cancel()
+        await asyncio.gather(worker_task, approvals_task, return_exceptions=True)
 
         if hasattr(_backend, "close"):
             await _backend.close()

@@ -3,8 +3,8 @@ import type { AgentTaskStatus } from "./agent.js";
 /** Single source of truth for AgentTask lifecycle transitions. */
 export const VALID_AGENT_TASK_TRANSITIONS: Record<AgentTaskStatus, AgentTaskStatus[]> = {
   queued: ["running", "pending_approval", "cancelled"],
-  pending_approval: ["running", "cancelled"],
-  running: ["succeeded", "failed"],
+  pending_approval: ["running", "failed", "cancelled"],
+  running: ["succeeded", "failed", "pending_approval"],
   failed: ["retried", "cancelled"],
   retried: ["succeeded", "cancelled"],
   succeeded: [],

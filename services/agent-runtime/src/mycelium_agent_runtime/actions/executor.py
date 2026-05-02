@@ -34,6 +34,11 @@ class ActionExecutor:
     2. Handles blocked actions (returns denial)
     3. Handles approval flow (if callback provided)
     4. Executes allowed actions via the backend
+
+    Pre-approved actions:
+    ``auto_approve_action_ids`` can be set to a list of action IDs that have
+    been pre-approved (e.g. via the approvals flow after a human reviewer
+    approved them). Actions with matching IDs skip the approval gate.
     """
 
     def __init__(
@@ -41,11 +46,21 @@ class ActionExecutor:
         backend: ExecutionBackend,
         guard: PermissionGuard | None = None,
         approval_callback: ApprovalCallback | None = None,
+        auto_approve_action_ids: list[str] | None = None,
     ) -> None:
         self._backend = backend
         self._guard = guard or PermissionGuard(rules=get_default_rules())
         self._approval_callback = approval_callback
+        self._auto_approve_action_ids: set[str] = set(auto_approve_action_ids or [])
         self._action_history: list[tuple[Action, ActionResult]] = []
+
+    def set_auto_approve_action_ids(self, action_ids: list[str]) -> None:
+        """Set the list of pre-approved action IDs."""
+        self._auto_approve_action_ids = set(action_ids)
+
+    def clear_auto_approve(self) -> None:
+        """Clear all pre-approved action IDs."""
+        self._auto_approve_action_ids.clear()
 
     async def execute(self, action: Action) -> ActionResult:
         """Execute an action through the permission system.
@@ -66,7 +81,13 @@ class ActionExecutor:
             return result
 
         if decision.needs_approval:
-            if self._approval_callback:
+            if action.id in self._auto_approve_action_ids:
+                logger.info(
+                    "Action %s pre-approved via auto_approve_action_ids",
+                    action.id,
+                )
+                action.status = ActionStatus.APPROVED
+            elif self._approval_callback:
                 logger.info(
                     "Action %s requires approval: %s",
                     action.type.value,
