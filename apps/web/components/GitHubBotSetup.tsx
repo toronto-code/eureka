@@ -1,5 +1,5 @@
 /**
- * Env-only GitHub wiring: links open GitHub/docs; credentials stay in `.env`.
+ * GitHub bot onboarding links + env hints (PAT may also be stored encrypted via Settings).
  */
 export function GitHubBotSetup({ githubConfigured }: { githubConfigured: boolean }) {
   return (
@@ -8,9 +8,10 @@ export function GitHubBotSetup({ githubConfigured }: { githubConfigured: boolean
       <p className="muted" style={{ marginTop: 0 }}>
         Create a{" "}
         <strong>dedicated bot GitHub account</strong>, add it as a collaborator on the target repo,
-        then paste its PAT into <code>GITHUB_TOKEN</code>. Set{" "}
+        then paste its PAT into <code>GITHUB_TOKEN</code> <strong>or</strong> use{" "}
+        <strong>Save GitHub PAT</strong> above (encrypted in Postgres). Set{" "}
         <code>GITHUB_OWNER</code> (or <code>GITHUB_ORG</code>), <code>GITHUB_REPO</code>, and restart
-        the API container.
+        the API container when changing env vars.
       </p>
       <div className="flex" style={{ gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
         <a

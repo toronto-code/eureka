@@ -16,6 +16,9 @@ export interface IntegrationStatus {
   auto_execute_enabled: boolean;
   github_real_mode: boolean;
   jira_watcher_enabled: boolean;
+  github_pat_storage_enabled: boolean;
+  github_pat_saved_in_database: boolean;
+  github_pat_hint: string | null;
 }
 
 export interface ExecutedAction {

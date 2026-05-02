@@ -21,7 +21,6 @@ from __future__ import annotations
 import base64
 import fnmatch
 import logging
-from functools import lru_cache
 from typing import Any
 
 import httpx
@@ -377,11 +376,12 @@ def _language_for(path: str) -> str:
     return "text"
 
 
-@lru_cache(maxsize=1)
 def get_github_client() -> GitHubClient:
+    from app.integrations.github_token import resolve_github_token
+
     settings = get_settings()
     return GitHubClient(
-        token=settings.github_token,
+        token=resolve_github_token(),
         owner=settings.effective_github_owner,
         repo=settings.github_repo,
         default_base_branch=settings.github_default_base_branch,

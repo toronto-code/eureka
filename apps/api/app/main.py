@@ -20,7 +20,7 @@ from sqlalchemy.exc import OperationalError
 
 from app.config import get_settings
 from app.db import Base, SessionLocal, engine
-from app.routes import agents, ingestion, ol, projects, system, tasks, webhooks
+from app.routes import agents, credentials, ingestion, ol, projects, system, tasks, webhooks
 
 # Ensure all model modules are imported so metadata is populated.
 from app import models  # noqa: F401
@@ -32,6 +32,9 @@ def _init_db_safely() -> None:
     settings = get_settings()
     try:
         Base.metadata.create_all(bind=engine)
+        from app.db.schema_patch import ensure_integration_credentials_secret_columns
+
+        ensure_integration_credentials_secret_columns()
     except OperationalError as exc:
         logger.warning("Database not reachable on startup: %s", exc)
         return
@@ -83,6 +86,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(system.router)
+    app.include_router(credentials.router)
     app.include_router(agents.router)
     app.include_router(tasks.router)
     app.include_router(ingestion.router)

@@ -76,6 +76,9 @@ export const api = {
         auto_execute_enabled: false,
         github_real_mode: false,
         jira_watcher_enabled: false,
+        github_pat_storage_enabled: false,
+        github_pat_saved_in_database: false,
+        github_pat_hint: null,
       },
     ),
   projectDataPreview: () =>

@@ -626,3 +626,47 @@ textarea {
     transform: rotate(360deg);
   }
 }
+
+/* Settings — encrypted GitHub PAT form */
+.pat-card .pat-snippet {
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  overflow-x: auto;
+}
+.pat-label {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.pat-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+.pat-hint-line {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.pat-hint-line code {
+  font-family: var(--mono);
+  color: var(--accent);
+}
+.pat-ok {
+  color: var(--green);
+  font-size: 13px;
+}
+.pat-err {
+  color: var(--red);
+  font-size: 13px;
+}
