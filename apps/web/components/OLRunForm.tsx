@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import type { ProjectSummary } from "../lib/types";
@@ -12,16 +12,22 @@ interface Props {
 
 export function OLRunForm({ projects, defaultProjectId }: Props) {
   const router = useRouter();
-  const [projectId, setProjectId] = useState(
-    defaultProjectId ?? projects[0]?.id ?? "",
-  );
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const projectId = defaultProjectId ?? projects[0]?.id ?? "";
   const [request, setRequest] = useState("");
-  const [jiraKey, setJiraKey] = useState("");
-  const [acceptance, setAcceptance] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const disabled = submitting || !projectId || !request.trim();
+
+  // Auto-resize textarea
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = "24px";
+      textarea.style.height = `${textarea.scrollHeight}px`;
+    }
+  }, [request]);
 
   async function onSubmit(ev: React.FormEvent) {
     ev.preventDefault();
@@ -34,11 +40,6 @@ export function OLRunForm({ projects, defaultProjectId }: Props) {
         body: JSON.stringify({
           user_request: request,
           origin: "manual",
-          jira_ticket_key: jiraKey || null,
-          acceptance_criteria: acceptance
-            .split("\n")
-            .map((l) => l.trim())
-            .filter(Boolean),
         }),
       });
       if (!res.ok) throw new Error(`run failed (${res.status})`);
@@ -49,6 +50,7 @@ export function OLRunForm({ projects, defaultProjectId }: Props) {
       } else {
         router.refresh();
       }
+      setRequest("");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -65,54 +67,66 @@ export function OLRunForm({ projects, defaultProjectId }: Props) {
     );
   }
 
+  const examplePrompts = [
+    "Summarize recent runs",
+    "Debug ingestion errors",
+    "Review open PRs",
+    "Check integration status",
+  ];
+
+  const handleExampleClick = (prompt: string) => {
+    setRequest(prompt);
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  };
+
   return (
-    <form className="card ol-run-form" onSubmit={onSubmit}>
-      <label>
-        <span>Project</span>
-        <select
-          value={projectId}
-          onChange={(e) => setProjectId(e.target.value)}
-        >
-          {projects.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
+    <div className="ol-chat-form">
+      {!request && (
+        <div className="ol-example-prompts">
+          {examplePrompts.map((prompt) => (
+            <button
+              key={prompt}
+              type="button"
+              className="ol-example-prompt"
+              onClick={() => handleExampleClick(prompt)}
+            >
+              {prompt}
+            </button>
           ))}
-        </select>
-      </label>
-      <label>
-        <span>Request</span>
-        <textarea
-          rows={4}
-          value={request}
-          placeholder="e.g. Add a short onboarding section to the payments docs."
-          onChange={(e) => setRequest(e.target.value)}
-          required
-        />
-      </label>
-      <div className="row">
-        <label className="flex-1">
-          <span>Jira ticket key (optional)</span>
-          <input
-            type="text"
-            value={jiraKey}
-            onChange={(e) => setJiraKey(e.target.value.toUpperCase())}
-            placeholder="PAY-101"
+        </div>
+      )}
+      <form onSubmit={onSubmit}>
+        <div className="ol-chat-input-wrapper">
+          <textarea
+            ref={textareaRef}
+            rows={1}
+            value={request}
+            placeholder="Ask a question or describe a task..."
+            onChange={(e) => setRequest(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                if (!disabled) onSubmit(e);
+              }
+            }}
+            required
           />
-        </label>
-      </div>
-      <label>
-        <span>Acceptance criteria (one per line, optional)</span>
-        <textarea
-          rows={3}
-          value={acceptance}
-          onChange={(e) => setAcceptance(e.target.value)}
-        />
-      </label>
-      {error && <div className="error">{error}</div>}
-      <button type="submit" disabled={disabled}>
-        {submitting ? "Running OL…" : "Run OL"}
-      </button>
-    </form>
+          <button type="submit" disabled={disabled} aria-label="Send">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M7 11L12 6L17 11M12 18V7"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        </div>
+        {error && <div className="ol-chat-error">{error}</div>}
+      </form>
+    </div>
   );
 }

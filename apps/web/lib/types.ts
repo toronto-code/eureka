@@ -432,3 +432,28 @@ export interface SyncResultDto {
   skipped: string[];
   errors: string[];
 }
+
+// ---------------------------------------------------------------------------
+// Observability types
+// ---------------------------------------------------------------------------
+
+export interface ObservabilityResponse {
+  timestamp: string;
+  services: {
+    service: string;
+    status: string;
+  }[];
+  integrations: {
+    [key: string]: string;
+  };
+  watchers: {
+    jira_watcher: {
+      enabled: boolean;
+      interval: number;
+    };
+  };
+  config: {
+    auto_execute: boolean;
+    github_real_mode: boolean;
+  };
+}
