@@ -11,6 +11,7 @@ import type {
   DocumentSummary,
   ExecutedAction,
   IntegrationStatus,
+  ObservabilityResponse,
   OLRunDetail,
   OLRunRequest,
   OLSearchRequest,
@@ -211,6 +212,9 @@ export const api = {
     request<SyncResultDto>(`/projects/${projectId}/sync/jira`, {
       method: "POST",
     }),
+
+  // ---- Observability ----------------------------------------------------
+  getObservability: () => request<ObservabilityResponse>("/observability"),
 };
 
 export type { AuditLog, OrchestratorOutput };
