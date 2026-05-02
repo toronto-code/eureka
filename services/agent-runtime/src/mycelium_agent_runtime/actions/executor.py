@@ -11,11 +11,21 @@ from mycelium_agent_runtime.permissions import (
     PermissionLevel,
     get_default_rules,
 )
+from mycelium_agent_runtime.permissions.rules import PermissionDecision
 
 if TYPE_CHECKING:
     from mycelium_agent_runtime.execution.backend import ExecutionBackend
+    from mycelium_agent_runtime.learning_client import LearningClient
 
 logger = logging.getLogger(__name__)
+
+# If learned preference confidence is >= this and suggestion is "auto", we
+# bypass the approval gate. Conservative: only act on well-established patterns.
+LEARNED_AUTO_APPROVE_CONFIDENCE = 0.5
+
+# If learned preference confidence is >= this and suggestion is "blocked", we
+# block the action even if the default rules would only require approval.
+LEARNED_BLOCK_CONFIDENCE = 0.7
 
 
 class ApprovalCallback(Protocol):
@@ -47,12 +57,16 @@ class ActionExecutor:
         guard: PermissionGuard | None = None,
         approval_callback: ApprovalCallback | None = None,
         auto_approve_action_ids: list[str] | None = None,
+        learning_client: LearningClient | None = None,
+        user_id: str | None = None,
     ) -> None:
         self._backend = backend
         self._guard = guard or PermissionGuard(rules=get_default_rules())
         self._approval_callback = approval_callback
         self._auto_approve_action_ids: set[str] = set(auto_approve_action_ids or [])
         self._action_history: list[tuple[Action, ActionResult]] = []
+        self._learning_client = learning_client
+        self._user_id = user_id
 
     def set_auto_approve_action_ids(self, action_ids: list[str]) -> None:
         """Set the list of pre-approved action IDs."""
@@ -62,8 +76,40 @@ class ActionExecutor:
         """Clear all pre-approved action IDs."""
         self._auto_approve_action_ids.clear()
 
+    def set_user_id(self, user_id: str | None) -> None:
+        """Set the user_id for learned preference lookups."""
+        self._user_id = user_id
+
+    async def _consult_learned_preference(
+        self, action: Action
+    ) -> dict[str, str | float | None] | None:
+        """Ask the learning service what it's learned for this (user, action_type).
+
+        Returns None if learning is disabled or unreachable. Otherwise returns
+        the preference dict (suggestion, confidence, ...).
+        """
+        if self._learning_client is None or not self._learning_client.enabled:
+            return None
+
+        try:
+            return await self._learning_client.get_effective_preference(
+                self._user_id, action.type.value
+            )
+        except Exception as exc:
+            logger.debug("learning preference lookup failed: %s", exc)
+            return None
+
     async def execute(self, action: Action) -> ActionResult:
         """Execute an action through the permission system.
+
+        Order of checks:
+        1. Default rules (hard block wins).
+        2. If default says "requires_approval", consult learned preferences:
+           - suggestion="auto" with high confidence  → bypass approval
+           - suggestion="blocked" with high confidence → block
+           - otherwise → normal approval flow
+        3. Pre-approved action IDs (from a prior human approval).
+        4. Approval callback (if wired).
 
         Returns the result of the action execution.
         """
@@ -81,13 +127,56 @@ class ActionExecutor:
             return result
 
         if decision.needs_approval:
-            if action.id in self._auto_approve_action_ids:
+            pref = await self._consult_learned_preference(action)
+            if pref is not None:
+                suggestion = pref.get("suggestion")
+                confidence = float(pref.get("confidence") or 0.0)
+
+                if (
+                    suggestion == "blocked"
+                    and confidence >= LEARNED_BLOCK_CONFIDENCE
+                ):
+                    logger.info(
+                        "Action %s blocked by learned preference "
+                        "(confidence=%.2f, source=%s)",
+                        action.type.value,
+                        confidence,
+                        pref.get("source"),
+                    )
+                    action.status = ActionStatus.BLOCKED
+                    result = ActionResult.blocked(
+                        action.id,
+                        f"Blocked by learned preference (confidence={confidence:.2f})",
+                    )
+                    result.metadata["learned_preference"] = pref
+                    self._action_history.append((action, result))
+                    return result
+
+                if (
+                    suggestion == "auto"
+                    and confidence >= LEARNED_AUTO_APPROVE_CONFIDENCE
+                ):
+                    logger.info(
+                        "Action %s auto-approved by learned preference "
+                        "(confidence=%.2f, source=%s, approval_rate=%.2f)",
+                        action.type.value,
+                        confidence,
+                        pref.get("source"),
+                        float(pref.get("approval_rate") or 0.0),
+                    )
+                    action.status = ActionStatus.APPROVED
+                    decision = PermissionDecision(
+                        level=PermissionLevel.AUTO,
+                        reason=f"Learned preference: auto (confidence={confidence:.2f})",
+                    )
+
+            if decision.needs_approval and action.id in self._auto_approve_action_ids:
                 logger.info(
                     "Action %s pre-approved via auto_approve_action_ids",
                     action.id,
                 )
                 action.status = ActionStatus.APPROVED
-            elif self._approval_callback:
+            elif decision.needs_approval and self._approval_callback:
                 logger.info(
                     "Action %s requires approval: %s",
                     action.type.value,
@@ -106,7 +195,7 @@ class ActionExecutor:
                     return result
 
                 action.status = ActionStatus.APPROVED
-            else:
+            elif decision.needs_approval:
                 action.status = ActionStatus.PENDING_APPROVAL
                 result = ActionResult.pending_approval(action.id, decision.reason)
                 self._action_history.append((action, result))

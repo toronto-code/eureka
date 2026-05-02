@@ -19,6 +19,7 @@ from mycelium_shared_types.agent import AgentTaskStatus
 if TYPE_CHECKING:
     from mycelium_agent_runtime.execution.backend import ExecutionBackend
     from mycelium_agent_runtime.actions.executor import ActionExecutor
+    from mycelium_agent_runtime.learning_client import LearningClient
 
 logger = logging.getLogger(__name__)
 
@@ -46,13 +47,29 @@ def _create_backend() -> ExecutionBackend:
     return LocalBackend(working_directory=WORKING_DIRECTORY)
 
 
-def _create_executor(backend: ExecutionBackend) -> ActionExecutor:
+def _create_executor(
+    backend: ExecutionBackend,
+    learning_client: LearningClient | None = None,
+) -> ActionExecutor:
     """Create the action executor with permission guard."""
     from mycelium_agent_runtime.actions.executor import ActionExecutor
     from mycelium_agent_runtime.permissions import PermissionGuard, get_default_rules
 
     guard = PermissionGuard(rules=get_default_rules())
-    return ActionExecutor(backend=backend, guard=guard)
+    return ActionExecutor(
+        backend=backend,
+        guard=guard,
+        learning_client=learning_client,
+    )
+
+
+def _create_learning_client() -> LearningClient | None:
+    """Create the learning client, or None if disabled."""
+    from mycelium_agent_runtime.learning_client import LearningClient, LEARNING_ENABLED
+
+    if not LEARNING_ENABLED:
+        return None
+    return LearningClient()
 
 
 async def _query_knowledge(prompt: str) -> dict[str, Any]:
@@ -168,24 +185,30 @@ async def _publish_approval_request(
 async def run_task_worker(
     backend: ExecutionBackend | None = None,
     executor: ActionExecutor | None = None,
+    learning_client: LearningClient | None = None,
 ) -> None:
     """Run the agent task worker.
 
     Args:
         backend: Optional execution backend (creates default if not provided)
         executor: Optional action executor (creates default if not provided)
+        learning_client: Optional learning client (creates default if not provided)
     """
     bus = _bus()
 
     if backend is None:
         backend = _create_backend()
 
+    if learning_client is None:
+        learning_client = _create_learning_client()
+
     if executor is None:
-        executor = _create_executor(backend)
+        executor = _create_executor(backend, learning_client=learning_client)
 
     logger.info(
-        "agent-runtime worker starting (backend=%s)",
+        "agent-runtime worker starting (backend=%s, learning=%s)",
         type(backend).__name__,
+        "on" if learning_client and learning_client.enabled else "off",
     )
 
     async def handle(message_id: str, payload: dict[str, Any]) -> None:
@@ -209,6 +232,8 @@ async def run_task_worker(
                     task_id,
                     len(auto_approve_ids),
                 )
+
+            executor.set_user_id(input_data.get("user_id"))
 
             context = await _query_knowledge(input_data.get("prompt", ""))
             result = await _execute(payload, executor, context)
@@ -239,6 +264,7 @@ async def run_task_worker(
 
             executor.clear_history()
             executor.clear_auto_approve()
+            executor.set_user_id(None)
 
         except Exception as exc:
             logger.exception("Task failed: %s", task_id)

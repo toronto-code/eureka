@@ -15,7 +15,9 @@ Agent execution layer with pluggable backends. Supports local execution (dev) an
 │  Action Executor → propose actions                           │
 │    ↓                                                         │
 │  Permission Guard → check allowlist/blocklist                │
-│    ↓                                                         │
+│    ↓ (if requires_approval)                                  │
+│  Learning Client → ask learning service for user preference  │
+│    ↓ (if suggestion=auto & confidence≥0.5 → bypass approval) │
 │  Execution Backend → LocalBackend | OpenClawBackend          │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -38,6 +40,23 @@ Three-tier permission system for agent actions:
 | `auto` | Execute immediately | `ls`, `cat`, `git status`, read files |
 | `requires_approval` | Queue for human approval | `rm`, `git push`, write files |
 | `blocked` | Never allow | `sudo`, secrets access |
+
+### Learning integration (`learning_client.py`)
+
+When an action falls in `requires_approval`, the executor asks the learning
+service for a learned preference for `(user_id, action_type)`:
+
+- `suggestion="auto"` with `confidence ≥ 0.5` → bypass the approval gate
+- `suggestion="blocked"` with `confidence ≥ 0.7` → block the action
+- anything else → normal approval flow (human review)
+
+Hard-blocked rules (e.g. `sudo`) always win — learned preferences cannot
+override safety rules.
+
+Env vars:
+- `LEARNING_URL` (default `http://learning:8004`)
+- `LEARNING_ENABLED` (default `true`; set `false` to disable lookups)
+- `LEARNING_TIMEOUT` (default `2.0` seconds; fails open if learning is down)
 
 ### Execution Backends (`execution/`)
 

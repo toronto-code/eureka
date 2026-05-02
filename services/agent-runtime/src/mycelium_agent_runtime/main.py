@@ -11,8 +11,14 @@ from typing import Any
 from fastapi import FastAPI
 
 from mycelium_agent_runtime.approvals import run_approvals_consumer
+from mycelium_agent_runtime.learning_client import LearningClient
 from mycelium_agent_runtime.skills import registry
-from mycelium_agent_runtime.worker import run_task_worker, _create_backend, _create_executor
+from mycelium_agent_runtime.worker import (
+    run_task_worker,
+    _create_backend,
+    _create_executor,
+    _create_learning_client,
+)
 from mycelium_shared_types.health import HealthCheck, ok
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -20,6 +26,7 @@ logger = logging.getLogger("mycelium-agent-runtime")
 
 _backend = None
 _executor = None
+_learning_client: LearningClient | None = None
 
 
 def _announce_dev_mode() -> None:
@@ -29,17 +36,26 @@ def _announce_dev_mode() -> None:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    global _backend, _executor
+    global _backend, _executor, _learning_client
 
     _announce_dev_mode()
 
     _backend = _create_backend()
-    _executor = _create_executor(_backend)
+    _learning_client = _create_learning_client()
+    _executor = _create_executor(_backend, learning_client=_learning_client)
 
-    logger.info("Initialized execution backend: %s", type(_backend).__name__)
+    logger.info(
+        "Initialized execution backend: %s (learning=%s)",
+        type(_backend).__name__,
+        "on" if _learning_client and _learning_client.enabled else "off",
+    )
 
     worker_task = asyncio.create_task(
-        run_task_worker(backend=_backend, executor=_executor),
+        run_task_worker(
+            backend=_backend,
+            executor=_executor,
+            learning_client=_learning_client,
+        ),
         name="agent-runtime-worker",
     )
     approvals_task = asyncio.create_task(
@@ -106,6 +122,28 @@ async def spawn_agent(payload: dict) -> dict[str, Any]:
         "owner_user_id": owner_user_id,
         "status": "spawned",
         "stub": True,
+    }
+
+
+@app.get("/learning/preference")
+async def get_learning_preference(
+    action_type: str,
+    user_id: str | None = None,
+) -> dict[str, Any]:
+    """Show what the learning service says for this (user, action_type).
+
+    Useful for debugging the closed-loop: what preference will the executor
+    see when a skill proposes this action?
+    """
+    if _learning_client is None or not _learning_client.enabled:
+        return {"enabled": False, "preference": None}
+
+    pref = await _learning_client.get_effective_preference(user_id, action_type)
+    return {
+        "enabled": True,
+        "user_id": user_id,
+        "action_type": action_type,
+        "preference": pref,
     }
 
 
