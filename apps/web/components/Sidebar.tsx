@@ -2,15 +2,23 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Fragment } from "react";
 
-const NAV = [
+type NavItem = {
+  href: string;
+  label: string;
+  /** Render a thin divider above this item (used to separate Settings). */
+  divider?: boolean;
+};
+
+const NAV: NavItem[] = [
   { href: "/", label: "Dashboard" },
   { href: "/ol", label: "Orchestrator" },
   { href: "/tasks", label: "Tasks" },
   { href: "/ingestion", label: "Ingestion" },
   { href: "/orchestration", label: "Orchestration (legacy)" },
   { href: "/agents", label: "Agents" },
-  { href: "/settings", label: "Settings" },
+  { href: "/settings", label: "Settings", divider: true },
 ];
 
 export function Sidebar() {
@@ -18,7 +26,6 @@ export function Sidebar() {
   return (
     <aside className="sidebar">
       <h1>Mycelium</h1>
-      <div className="tag">Agentic intelligence</div>
       <nav className="nav">
         {NAV.map((item) => {
           const active =
@@ -26,16 +33,16 @@ export function Sidebar() {
               ? pathname === "/"
               : pathname.startsWith(item.href);
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={active ? "active" : ""}
-            >
-              {item.label}
-            </Link>
+            <Fragment key={item.href}>
+              {item.divider ? <div className="nav-divider" /> : null}
+              <Link href={item.href} className={active ? "active" : ""}>
+                {item.label}
+              </Link>
+            </Fragment>
           );
         })}
       </nav>
+      <div className="sidebar-spacer" />
     </aside>
   );
 }
