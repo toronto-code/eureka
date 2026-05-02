@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.crypto_credentials import fernet_from_settings
 from app.db import get_db
+from app.integrations.github_token import is_usable_github_token, resolve_github_token
 from app.schemas.api import IntegrationDiagnostic, IntegrationStatusOut
 from app.services.github_pat_store import github_pat_row
 from app.memory.project_data import ProjectDataService
@@ -185,8 +186,8 @@ def integration_status(session: Session = Depends(get_db)) -> IntegrationStatusO
 
     row = github_pat_row(session)
     pat_saved = bool(row and row.secret_ciphertext)
-    env_token = bool((settings.github_token or "").strip())
-    token_present = env_token or pat_saved
+    env_token = is_usable_github_token(settings.github_token)
+    token_present = bool(resolve_github_token())
     owner = settings.effective_github_owner
     github_ready = token_present and bool(owner and settings.github_repo)
     pat_hint = row.secret_hint if pat_saved else None
