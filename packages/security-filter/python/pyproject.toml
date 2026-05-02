@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "mycelium-security-filter"
+version = "0.1.0"
+description = "Pebblo-pattern enforcement library shared by apps/api and services/knowledge."
+authors = ["Mycelium <dev@mycelium.local>"]
+readme = "../README.md"
+packages = [{ include = "mycelium_security_filter", from = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pydantic = "^2.7.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

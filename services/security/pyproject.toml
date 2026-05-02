@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "mycelium-security"
+version = "0.1.0"
+description = "Sentra-pattern classifier. Sole consumer of events.raw."
+authors = ["Mycelium <dev@mycelium.local>"]
+readme = "README.md"
+packages = [{ include = "mycelium_security", from = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.111.0"
+uvicorn = { version = "^0.30.0", extras = ["standard"] }
+mycelium-shared-types = { path = "../../packages/shared-types/python", develop = true }
+mycelium-event-bus = { path = "../../packages/event-bus/python", develop = true }
+mycelium-security-filter = { path = "../../packages/security-filter/python", develop = true }
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

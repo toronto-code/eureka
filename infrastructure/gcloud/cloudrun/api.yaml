@@ -1,0 +1,44 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: mycelium-api
+  annotations:
+    run.googleapis.com/launch-stage: GA
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/cpu-throttling: "false"
+        autoscaling.knative.dev/maxScale: "5"
+        run.googleapis.com/vpc-access-connector: projects/PROJECT_ID/locations/REGION/connectors/mycelium-vpc
+        run.googleapis.com/vpc-access-egress: private-ranges-only
+    spec:
+      containerConcurrency: 40
+      containers:
+        - image: REGION-docker.pkg.dev/PROJECT_ID/mycelium/api:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DEV_MODE
+              value: "false"
+            - name: POSTGRES_DSN
+              valueFrom:
+                secretKeyRef: { name: mycelium-postgres-dsn, key: latest }
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef: { name: mycelium-redis-url, key: latest }
+            - name: KNOWLEDGE_URL
+              value: https://mycelium-knowledge-XXX-uc.a.run.app
+            - name: AGENT_RUNTIME_URL
+              value: https://mycelium-agent-runtime-XXX-uc.a.run.app
+            - name: INTEGRATIONS_URL
+              value: https://mycelium-integrations-XXX-uc.a.run.app
+            - name: PROCESS_INTEL_URL
+              value: https://mycelium-process-intel-XXX-uc.a.run.app
+            - name: LEARNING_URL
+              value: https://mycelium-learning-XXX-uc.a.run.app
+            - name: SECURITY_URL
+              value: https://mycelium-security-XXX-uc.a.run.app
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef: { name: mycelium-jwt-secret, key: latest }

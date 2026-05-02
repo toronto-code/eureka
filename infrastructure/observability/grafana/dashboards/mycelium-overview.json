@@ -1,0 +1,32 @@
+{
+  "title": "Mycelium — Overview",
+  "schemaVersion": 38,
+  "panels": [
+    {
+      "type": "stat",
+      "title": "API requests/sec",
+      "targets": [{ "expr": "sum(rate(api_requests_total[1m]))" }],
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 }
+    },
+    {
+      "type": "stat",
+      "title": "DLQ size (last 5m)",
+      "targets": [{ "expr": "sum(increase(security_dlq_total[5m]))" }],
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Events published",
+      "targets": [{ "expr": "sum by (topic) (rate(integrations_events_published_total[1m]))" }],
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Agent tasks by status",
+      "targets": [
+        { "expr": "sum by (status) (rate(agent_runtime_agent_tasks_total[1m]))" }
+      ],
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 12 }
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "mycelium-learning"
+version = "0.1.0"
+description = "OpenClaw-RL feedback observer. Stub for full RL impl."
+authors = ["Mycelium <dev@mycelium.local>"]
+readme = "README.md"
+packages = [{ include = "mycelium_learning", from = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.111.0"
+uvicorn = { version = "^0.30.0", extras = ["standard"] }
+mycelium-shared-types = { path = "../../packages/shared-types/python", develop = true }
+mycelium-event-bus = { path = "../../packages/event-bus/python", develop = true }
+mycelium-db = { path = "../../packages/db/python", develop = true }
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

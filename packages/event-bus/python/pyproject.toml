@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "mycelium-event-bus"
+version = "0.1.0"
+description = "Redis Streams event bus for Mycelium services."
+authors = ["Mycelium <dev@mycelium.local>"]
+readme = "../README.md"
+packages = [{ include = "mycelium_event_bus", from = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+redis = "^5.0.0"
+pydantic = "^2.7.0"
+mycelium-shared-types = { path = "../../shared-types/python", develop = true }
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

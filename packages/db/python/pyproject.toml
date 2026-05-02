@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "mycelium-db"
+version = "0.1.0"
+description = "Database clients (Postgres + Neo4j) and migrations for Mycelium."
+authors = ["Mycelium <dev@mycelium.local>"]
+readme = "../README.md"
+packages = [{ include = "mycelium_db", from = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+sqlalchemy = "^2.0.30"
+asyncpg = "^0.29.0"
+psycopg = { version = "^3.1.18", extras = ["binary"] }
+pgvector = "^0.2.5"
+alembic = "^1.13.1"
+neo4j = "^5.20.0"
+pydantic = "^2.7.0"
+mycelium-shared-types = { path = "../../shared-types/python", develop = true }
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

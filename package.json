@@ -1,0 +1,29 @@
+{
+  "name": "mycelium",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mycelium — company-wide agentic intelligence layer.",
+  "packageManager": "pnpm@9.0.0",
+  "workspaces": [
+    "apps/frontend",
+    "packages/shared-types/typescript",
+    "packages/event-bus/typescript"
+  ],
+  "scripts": {
+    "dev:frontend": "pnpm --filter @mycelium/frontend dev",
+    "build:frontend": "pnpm --filter @mycelium/frontend build",
+    "build:types": "pnpm --filter @mycelium/shared-types build",
+    "build:event-bus": "pnpm --filter @mycelium/event-bus build",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "compose:up": "docker compose up --build",
+    "compose:down": "docker compose down -v"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

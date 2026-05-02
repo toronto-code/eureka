@@ -1,0 +1,20 @@
+# Avoid sending huge contexts to docker build
+**/node_modules
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/dist
+**/build
+**/.next
+**/.vite
+**/.cache
+**/.turbo
+.git
+.idea
+.vscode
+.observer-state.json
+*.log
+.env
+.env.*.local

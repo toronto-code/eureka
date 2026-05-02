@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "mycelium-observer"
+version = "0.1.0"
+description = "Local developer-machine watcher. NOT for Docker."
+authors = ["Mycelium <dev@mycelium.local>"]
+readme = "README.md"
+packages = [{ include = "mycelium_observer", from = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+httpx = "^0.27.0"
+watchdog = "^4.0.0"
+pydantic = "^2.7.0"
+python-dotenv = "^1.0.1"
+mycelium-shared-types = { path = "../../packages/shared-types/python", develop = true }
+
+[tool.poetry.scripts]
+mycelium-observer = "mycelium_observer.main:run"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

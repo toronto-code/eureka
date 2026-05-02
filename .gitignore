@@ -1,0 +1,37 @@
+# Env
+.env
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+
+# Node
+node_modules/
+.pnpm-store/
+.turbo/
+.next/
+.vite/
+.cache/
+
+# Editors
+.vscode/
+.idea/
+.DS_Store
+
+# Logs / local data
+*.log
+logs/
+.local/
+.observer-state.json
+
+# Docker volumes (if mounted locally)
+.data/
