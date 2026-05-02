@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "mycelium-agent-runtime"
 version = "0.1.0"
-description = "OpenClaw + Claworc agent execution layer."
+description = "Agent execution layer — local backend, permissions, skills, LLM reasoning."
 authors = ["Mycelium <dev@mycelium.local>"]
 readme = "README.md"
 packages = [{ include = "mycelium_agent_runtime", from = "src" }]

@@ -212,9 +212,15 @@ async def _publish_result(
     result: dict[str, Any] | None,
     error: str | None,
 ) -> None:
+    # Forward agent_type + user_id so the learning service can build
+    # per-user skill models (Signal.from_task_result reads these).
+    input_data = task.get("input_data") or {}
     payload = {
         "task_id": task["task_id"],
         "agent_id": task.get("agent_id"),
+        "agent_type": task.get("agent_type"),
+        "user_id": input_data.get("user_id") or task.get("user_id"),
+        "input_data": input_data,
         "status": status.value,
         "result": result,
         "error": error,

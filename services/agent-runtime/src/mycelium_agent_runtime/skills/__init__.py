@@ -128,11 +128,48 @@ async def _onboard(input_data: dict) -> dict:
 
 
 async def _chat(input_data: dict) -> dict:
-    """Handle chat interactions."""
+    """Handle chat interactions.
+
+    Uses the shared LLM client when a key is configured; falls back to an
+    echo response so the demo still works with no API key.
+    """
+    from mycelium_agent_runtime.llm import LLMClient
+
     prompt = input_data.get("prompt", "")
+    if not prompt:
+        return {"response": "", "stub": False}
+
+    llm = LLMClient()
+    if llm.enabled:
+        recent = input_data.get("recent_turns", "")
+        memories = input_data.get("relevant_memories", [])
+        mem_block = ""
+        if isinstance(memories, list) and memories:
+            mem_block = "\n".join(
+                f"- {(m.get('summary') or m.get('content') or str(m))[:200]}"
+                for m in memories[:3]
+                if isinstance(m, dict)
+            )
+        user_msg = prompt
+        system = (
+            "You are Mycelium, a concise engineering-focused assistant. "
+            "Answer directly. Use prior context when helpful."
+            + (f"\n\nRecent turns:\n{recent}" if recent else "")
+            + (f"\n\nRelevant memories:\n{mem_block}" if mem_block else "")
+        )
+        resp = await llm.complete(user_msg, system=system)
+        if not resp.stub and resp.text:
+            return {
+                "response": resp.text.strip(),
+                "model": resp.model,
+                "provider": resp.provider,
+                "stub": False,
+            }
+
     return {
         "response": f"(stub) I received your message: {prompt[:100]}",
         "stub": True,
+        "provider": "stub",
     }
 
 

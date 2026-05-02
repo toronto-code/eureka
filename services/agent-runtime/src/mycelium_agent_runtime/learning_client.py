@@ -14,7 +14,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-LEARNING_URL = os.getenv("LEARNING_URL", "http://learning:8004")
+LEARNING_URL = os.getenv("LEARNING_URL", "http://learning:8005")
 LEARNING_TIMEOUT = float(os.getenv("LEARNING_TIMEOUT", "2.0"))
 LEARNING_ENABLED = os.getenv("LEARNING_ENABLED", "true").lower() in ("1", "true", "yes")
 
