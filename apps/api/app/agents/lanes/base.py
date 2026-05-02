@@ -54,7 +54,7 @@ class BaseLane(ABC):
 
     @staticmethod
     def _citations_from(chunks: list[RetrievedChunk]) -> list[dict[str, Any]]:
-        out: list[dict[str, Any]] = []
+        out: list[dict[str, Any ]] = []
         for c in chunks[:10]:
             label = c.file_path or c.source_type
             if c.start_line and c.end_line:

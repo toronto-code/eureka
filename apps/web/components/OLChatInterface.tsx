@@ -145,8 +145,8 @@ export function OLChatInterface({ projects, defaultProjectId }: Props) {
   const [agentMode, setAgentMode] = useState(true);
   const [actions, setActions] = useState<AgentAction[]>([]);
 
-  const scrollRef = useRef<HTMLDivElement | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sseRef = useRef<EventSource | null>(null);
   // Track sessionId in a ref so the auto-save effect always uses the current value
   const sessionIdRef = useRef(sessionId);
@@ -374,8 +374,8 @@ interface RunTabProps {
   busy: boolean;
   agentMode: boolean;
   actions: AgentAction[];
-  scrollRef: React.RefObject<HTMLDivElement | null>;
-  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  scrollRef: React.RefObject<HTMLDivElement>;
+  textareaRef: React.RefObject<HTMLTextAreaElement>;
   onInputChange: (v: string) => void;
   onAgentModeChange: (v: boolean) => void;
   onSend: () => void;
