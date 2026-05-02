@@ -18,7 +18,8 @@
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
     "compose:up": "docker compose up --build",
-    "compose:down": "docker compose down -v"
+    "compose:down": "docker compose down -v",
+    "test": "pnpm --filter @mycelium/frontend test"
   },
   "devDependencies": {
     "typescript": "^5.4.0"

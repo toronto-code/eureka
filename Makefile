@@ -1,4 +1,4 @@
-.PHONY: up down logs rebuild seed migrate types-py types-ts observer help
+.PHONY: up down logs rebuild seed migrate types-py types-ts observer test help
 
 help:
 	@echo "Mycelium dev commands:"
@@ -9,6 +9,7 @@ help:
 	@echo "  make seed       - re-run the seed script"
 	@echo "  make migrate    - run alembic upgrade head"
 	@echo "  make observer   - run the local observer (NOT in docker)"
+	@echo "  make test       - run Python + frontend unit tests"
 
 up:
 	docker compose up --build
@@ -37,3 +38,6 @@ types-ts:
 
 types-py:
 	@echo "shared-types is a path-installed dependency; nothing to build."
+
+test:
+	bash scripts/ci/run-tests.sh

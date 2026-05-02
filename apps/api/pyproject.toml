@@ -18,6 +18,15 @@ mycelium-event-bus = { path = "../../packages/event-bus/python", develop = true 
 mycelium-db = { path = "../../packages/db/python", develop = true }
 mycelium-security-filter = { path = "../../packages/security-filter/python", develop = true }
 
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.3"
+pytest-asyncio = "^0.24.0"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+norecursedirs = [".*", "build", "dist"]
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

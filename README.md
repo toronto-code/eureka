@@ -24,6 +24,14 @@ After the stack is up:
 
 A seed script populates fake events, a fake company graph, fake `integration_syncs` rows, and fake agent activity so the UI is non-empty on first run.
 
+## Testing
+
+```bash
+make test
+```
+
+Runs `scripts/ci/run-tests.sh`: **Python tests** inside `python:3.11-slim` (asyncpg/pgvector-compatible) and **frontend tests** (`vitest`) in `node:20-bookworm-slim`. Requires Docker. With **Poetry** on the host, you can alternatively run each package under `pytest` individually if your interpreter is Python 3.11+.
+
 ## Layout
 
 ```

@@ -13,17 +13,9 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from mycelium_db.models import Base
+from mycelium_db.migration_dsn import coerce_dsn_for_alembic
 
 config = context.config
-
-
-def _sync_migration_url(dsn: str) -> str:
-    """Alembic uses synchronous SQLAlchemy engines; coerce app DSNs to psycopg (v3)."""
-    if dsn.startswith("postgresql+asyncpg://"):
-        return dsn.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
-    if dsn.startswith("postgresql://"):
-        return dsn.replace("postgresql://", "postgresql+psycopg://", 1)
-    return dsn
 
 
 if config.config_file_name is not None:
@@ -31,7 +23,7 @@ if config.config_file_name is not None:
 
 dsn = os.getenv("POSTGRES_DSN")
 if dsn:
-    config.set_main_option("sqlalchemy.url", _sync_migration_url(dsn))
+    config.set_main_option("sqlalchemy.url", coerce_dsn_for_alembic(dsn))
 
 target_metadata = Base.metadata
 

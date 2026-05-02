@@ -5,7 +5,10 @@ already exist; dispatch must insert ``queued`` tasks first."""
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import HTTPException
+from sqlalchemy import select
 
 from mycelium_db import AgentRow, AgentTaskRow, get_session
 from mycelium_event_bus import EventBus, Topic

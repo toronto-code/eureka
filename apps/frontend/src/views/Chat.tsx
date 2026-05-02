@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api } from "../api";
 import type { AgentTaskSummary } from "../api";
+import { formatAgentReply } from "../lib/agentReplyFormat";
 
 interface Message {
   role: "user" | "agent" | "system";
@@ -22,25 +23,6 @@ async function pollUntilTerminal(agentId: string, taskId: string): Promise<Agent
     delayMs = Math.min(Math.floor(delayMs * 1.2), 2000);
   }
   throw new Error("Timed out waiting for agent task (60s).");
-}
-
-function formatAgentReply(task: AgentTaskSummary): string {
-  if (task.status === "failed") {
-    return task.error ?? "Agent task failed.";
-  }
-  if (task.status === "cancelled") {
-    return "Task was cancelled.";
-  }
-  const res = task.result;
-  if (
-    res &&
-    typeof res === "object" &&
-    "summary" in res &&
-    typeof (res as { summary: unknown }).summary === "string"
-  ) {
-    return (res as { summary: string }).summary;
-  }
-  return res !== undefined ? JSON.stringify(res) : "(no body)";
 }
 
 export function Chat() {
