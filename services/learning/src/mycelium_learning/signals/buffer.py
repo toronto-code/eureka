@@ -59,22 +59,25 @@ class SignalBuffer:
         if not self._buffer:
             return
 
-        signals = self._buffer
+        signals = list(self._buffer)
         self._buffer = []
-        self._last_flush = time.monotonic()
-        self._total_flushes += 1
 
         logger.info(
             "Flushing %d signals (reason=%s, total_flushes=%d)",
             len(signals),
             reason,
-            self._total_flushes,
+            self._total_flushes + 1,
         )
 
         try:
             await self._on_flush(signals)
         except Exception as e:
             logger.exception("Flush callback failed: %s", e)
+            self._buffer = signals + self._buffer
+            return
+
+        self._last_flush = time.monotonic()
+        self._total_flushes += 1
 
     def start_ticker(self) -> None:
         """Start the background ticker for time-based flushes."""

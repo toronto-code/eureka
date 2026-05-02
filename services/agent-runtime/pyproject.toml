@@ -15,6 +15,7 @@ aiofiles = "^24.1.0"
 mycelium-shared-types = { path = "../../packages/shared-types/python", develop = true }
 mycelium-event-bus = { path = "../../packages/event-bus/python", develop = true }
 mycelium-db = { path = "../../packages/db/python", develop = true }
+mycelium-embeddings = { path = "../../packages/embeddings/python", develop = true }
 
 [build-system]
 requires = ["poetry-core"]

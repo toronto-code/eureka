@@ -54,7 +54,7 @@ Hard-blocked rules (e.g. `sudo`) always win — learned preferences cannot
 override safety rules.
 
 Env vars:
-- `LEARNING_URL` (default `http://learning:8004`)
+- `LEARNING_URL` (default `http://learning:8005`)
 - `LEARNING_ENABLED` (default `true`; set `false` to disable lookups)
 - `LEARNING_TIMEOUT` (default `2.0` seconds; fails open if learning is down)
 

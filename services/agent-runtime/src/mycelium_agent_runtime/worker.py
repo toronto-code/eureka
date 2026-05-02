@@ -309,7 +309,7 @@ async def run_task_worker(
                     len(auto_approve_ids),
                 )
 
-            executor.set_user_id(input_data.get("user_id"))
+            executor.set_user_id(_user_id_for(payload))
 
             context = await _query_knowledge(input_data.get("prompt", ""))
             result = await _execute(payload, executor, context)

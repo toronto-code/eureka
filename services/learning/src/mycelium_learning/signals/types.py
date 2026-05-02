@@ -89,7 +89,7 @@ class Signal:
         return cls(
             kind=SignalKind.TASK_RESULT,
             outcome=outcome,
-            user_id=input_data.get("user_id"),
+            user_id=input_data.get("user_id") or payload.get("user_id"),
             agent_id=payload.get("agent_id"),
             task_id=payload.get("task_id"),
             agent_type=payload.get("agent_type"),
