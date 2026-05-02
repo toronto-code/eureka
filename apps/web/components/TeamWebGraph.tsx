@@ -25,7 +25,7 @@ interface Props {
   web?: WebData;
 }
 
-const STYLE: cytoscape.Stylesheet[] = [
+const STYLE: any[] = [
   {
     selector: "node",
     style: {
