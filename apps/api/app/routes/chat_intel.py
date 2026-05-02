@@ -77,6 +77,12 @@ async def fetch_github(client: httpx.AsyncClient, team_logins: set[str] | None =
     repos = await _gh_request(client, "/user/repos", {"per_page": 30, "sort": "pushed"})
     if not isinstance(repos, list):
         repos = []
+    # Fine-grained PATs can fail on /user/repos; fall back to configured repo.
+    if not repos:
+        owner = os.getenv("GITHUB_OWNER", "") or os.getenv("GITHUB_ORG", "")
+        repo = os.getenv("GITHUB_REPO", "")
+        if owner and repo:
+            repos = [{"name": repo, "owner": {"login": owner}, "language": None, "description": ""}]
 
     if team_logins:
         team_norms = {t.lower().replace(" ", "") for t in team_logins}

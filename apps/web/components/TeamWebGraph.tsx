@@ -129,7 +129,7 @@ export function TeamWebGraph({ profiles, activity, currentUserId, web }: Props) 
     cyRef.current = cytoscape({
       container: ref.current,
       elements: [...nodes, ...edges],
-      style: STYLE,
+      style: STYLE as any,
       layout: { name: "cose", animate: false, idealEdgeLength: () => 95, nodeRepulsion: () => 4500, padding: 24 } as any,
       wheelSensitivity: 0.2,
     });

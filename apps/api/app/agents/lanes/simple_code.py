@@ -253,6 +253,8 @@ class SimpleCodeLane(BaseLane):
             raw = self._llm.generate_json(
                 system_prompt=SIMPLE_CODE_SYSTEM_PROMPT,
                 user_prompt=user_prompt,
+                temperature=0.0,
+                max_tokens=1400,
             )
             return SimpleCodePlan.model_validate(raw)
         except ValidationError as exc:
